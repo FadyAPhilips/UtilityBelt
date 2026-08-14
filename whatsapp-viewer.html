@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp Chat Viewer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --wa-teal:#008069;
+    --wa-teal-dark:#025144;
+    --wa-canvas:#efeae2;
+    --wa-out:#d9fdd3;
+    --wa-out-tick:#53bdeb;
+    --wa-in:#ffffff;
+    --wa-bubble-shadow:0 1px 0.5px rgba(11,20,26,.13);
+    --wa-meta:#667781;
+    --wa-sysbg:#ffffff;
+    --wa-pill:#e1f2fb;
+    --wa-pill-text:#54656f;
+    --wa-link:#027eb5;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:var(--font);
+    background:#d1d7db;
+    color:#111b21;
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+    overflow:hidden;
+  }
+
+  /* ---------- Top bar ---------- */
+  .appbar{
+    background:var(--wa-teal);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:10px 16px;
+    flex:none;
+    box-shadow:0 1px 3px rgba(0,0,0,.2);
+    z-index:5;
+  }
+  .appbar .avatar{
+    width:40px;height:40px;border-radius:50%;
+    background:var(--wa-teal-dark);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:600;font-size:16px;flex:none;
+  }
+  .appbar .title{font-weight:600;font-size:16px;line-height:1.2;}
+  .appbar .subtitle{font-size:12.5px;opacity:.85;line-height:1.2;}
+  .appbar .spacer{flex:1;}
+  .appbar .controls{display:flex;align-items:center;gap:10px;}
+  .appbar select, .appbar input[type=search]{
+    font-family:var(--font);
+    font-size:13px;
+    border:none;
+    border-radius:8px;
+    padding:7px 10px;
+    background:rgba(255,255,255,.15);
+    color:#fff;
+    outline:none;
+    max-width:190px;
+  }
+  .appbar input[type=search]::placeholder{color:rgba(255,255,255,.75);}
+  .appbar select option{color:#111;}
+  .appbar label{font-size:12px;opacity:.9;}
+  .appbar button.reset{
+    background:rgba(255,255,255,.15);border:none;color:#fff;
+    padding:7px 12px;border-radius:8px;font-size:13px;cursor:pointer;
+  }
+  .appbar button.reset:hover{background:rgba(255,255,255,.28);}
+  .hidden{display:none !important;}
+
+  /* ---------- Chat canvas ---------- */
+  .chat{
+    flex:1;
+    overflow-y:auto;
+    padding:12px 6% 24px;
+    background-color:var(--wa-canvas);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='%23000000' fill-opacity='0.035'%3E%3Cpath d='M30 5c2 4 6 6 10 6-4 2-6 6-6 10-2-4-6-6-10-6 4-2 6-6 6-10zM12 34c1 2 3 3 5 3-2 1-3 3-3 5-1-2-3-3-5-3 2-1 3-3 3-5zM46 40c1 2 3 3 5 3-2 1-3 3-3 5-1-2-3-3-5-3 2-1 3-3 3-5z'/%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  .date-sep{display:flex;justify-content:center;margin:14px 0;}
+  .date-sep span{
+    background:var(--wa-pill);
+    color:var(--wa-pill-text);
+    font-size:12.5px;
+    padding:5px 12px;
+    border-radius:8px;
+    box-shadow:var(--wa-bubble-shadow);
+  }
+
+  .row{display:flex;margin:2px 0;}
+  .row.out{justify-content:flex-end;}
+  .row.in{justify-content:flex-start;}
+  .row.sys{justify-content:center;margin:10px 0;}
+
+  .bubble{
+    position:relative;
+    max-width:min(75%, 560px);
+    background:var(--wa-in);
+    border-radius:7.5px;
+    padding:6px 9px 8px;
+    box-shadow:var(--wa-bubble-shadow);
+    font-size:14.2px;
+    line-height:19px;
+    word-wrap:break-word;
+    overflow-wrap:anywhere;
+  }
+  .row.out .bubble{background:var(--wa-out);}
+
+  /* little bubble tails */
+  .bubble.tail-in::before,
+  .bubble.tail-out::before{
+    content:"";position:absolute;top:0;width:8px;height:13px;
+  }
+  .bubble.tail-in::before{
+    left:-8px;
+    background:radial-gradient(circle at bottom left, transparent 8px, var(--wa-in) 8px);
+    /* fallback simple triangle */
+    border-top:0;
+  }
+  .tail-in{border-top-left-radius:0;}
+  .tail-out{border-top-right-radius:0;}
+  .tail-in::after{
+    content:"";position:absolute;top:0;left:-8px;
+    border-width:0 8px 8px 0;border-style:solid;
+    border-color:transparent var(--wa-in) transparent transparent;
+  }
+  .tail-out::after{
+    content:"";position:absolute;top:0;right:-8px;
+    border-width:0 0 8px 8px;border-style:solid;
+    border-color:transparent transparent transparent var(--wa-out);
+  }
+
+  .sender{
+    font-size:12.8px;font-weight:600;margin-bottom:2px;display:block;
+  }
+  .body-text{white-space:pre-wrap;}
+  .body-text a{color:var(--wa-link);}
+  .meta{
+    float:right;margin:6px 0 -4px 8px;
+    font-size:11px;color:var(--wa-meta);
+    user-select:none;
+  }
+
+  /* media */
+  .media-img, .media-video{
+    display:block;border-radius:6px;max-width:100%;
+    max-height:340px;cursor:pointer;margin-bottom:3px;
+  }
+  .media-video{cursor:default;}
+  .media-audio{margin:2px 0 4px;}
+  .media-audio audio{width:260px;max-width:100%;height:40px;}
+  .audio-wrap{display:flex;align-items:center;gap:8px;}
+  .voice-badge{
+    width:32px;height:32px;border-radius:50%;flex:none;
+    background:var(--wa-teal);color:#fff;display:flex;
+    align-items:center;justify-content:center;font-size:15px;
+  }
+  .doc{
+    display:flex;align-items:center;gap:10px;
+    background:rgba(0,0,0,.04);border-radius:8px;
+    padding:10px 12px;margin-bottom:3px;text-decoration:none;color:inherit;
+  }
+  .row.out .doc{background:rgba(0,0,0,.05);}
+  .doc .ico{
+    width:34px;height:40px;flex:none;border-radius:4px;
+    background:#fff;border:1px solid #d5dbd7;display:flex;
+    align-items:center;justify-content:center;font-size:15px;
+  }
+  .doc .info{min-width:0;}
+  .doc .name{font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .doc .sub{font-size:11.5px;color:var(--wa-meta);}
+  .doc .dl{margin-left:auto;font-size:18px;color:var(--wa-teal);}
+  .missing{
+    display:inline-flex;align-items:center;gap:6px;
+    color:var(--wa-meta);font-style:italic;font-size:13.5px;
+  }
+  .caption{margin-top:4px;}
+
+  .row.sys .bubble{
+    background:var(--wa-pill);color:var(--wa-pill-text);
+    text-align:center;font-size:12.7px;max-width:85%;
+    box-shadow:var(--wa-bubble-shadow);border-radius:8px;
+  }
+  .row.sys .meta{display:none;}
+
+  /* ---------- Drop / landing screen ---------- */
+  .landing{
+    flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:22px;text-align:center;
+    background:linear-gradient(180deg,#00a884 0%,#00a884 130px,#d1d7db 130px,#d1d7db 100%);
+    padding:24px;
+  }
+  .landing .card{
+    background:#fff;border-radius:14px;padding:38px 34px;
+    max-width:520px;width:100%;
+    box-shadow:0 12px 40px rgba(11,20,26,.15);
+  }
+  .landing h1{margin:0 0 6px;font-size:22px;color:#111b21;}
+  .landing p{margin:0 0 22px;color:#54656f;font-size:14.5px;line-height:1.5;}
+  .dropzone{
+    border:2px dashed #9fb4ad;border-radius:12px;
+    padding:34px 20px;transition:.15s;cursor:pointer;
+    background:#f7faf9;
+  }
+  .dropzone.drag{border-color:var(--wa-teal);background:#e9f6f1;}
+  .dropzone .big{font-size:40px;margin-bottom:8px;}
+  .dropzone .hint{color:#54656f;font-size:14px;}
+  .dropzone .pick{
+    color:var(--wa-teal);font-weight:600;text-decoration:underline;
+  }
+  .landing .note{
+    margin-top:16px;font-size:12.5px;color:#8696a0;line-height:1.5;
+  }
+  .status{
+    margin-top:14px;font-size:13.5px;color:var(--wa-teal-dark);min-height:18px;
+  }
+  .status.err{color:#c0392b;}
+
+  /* scrollbar */
+  .chat::-webkit-scrollbar{width:10px;}
+  .chat::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:6px;}
+
+  /* lightbox */
+  .lightbox{
+    position:fixed;inset:0;background:rgba(0,0,0,.9);
+    display:none;align-items:center;justify-content:center;z-index:50;
+  }
+  .lightbox.open{display:flex;}
+  .lightbox img{max-width:92vw;max-height:92vh;border-radius:4px;}
+  .lightbox .close{
+    position:absolute;top:18px;right:24px;color:#fff;font-size:32px;
+    cursor:pointer;line-height:1;
+  }
+</style>
+</head>
+<body>
+
+  <!-- App bar (hidden until a chat is loaded) -->
+  <div class="appbar hidden" id="appbar">
+    <div class="avatar" id="avatar">💬</div>
+    <div>
+      <div class="title" id="chatTitle">Chat</div>
+      <div class="subtitle" id="chatSubtitle"></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="controls">
+      <input type="search" id="search" placeholder="Search messages…">
+      <label>You:</label>
+      <select id="meSelect"><option value="">— none —</option></select>
+      <button class="reset" id="resetBtn">New file</button>
+    </div>
+  </div>
+
+  <!-- Landing -->
+  <div class="landing" id="landing">
+    <div class="card">
+      <h1>WhatsApp Chat Viewer</h1>
+      <p>Drop your exported WhatsApp <b>.zip</b> here to rebuild the conversation — with photos, videos, voice notes and documents in place. Everything runs locally in your browser; nothing is uploaded.</p>
+      <div class="dropzone" id="dropzone">
+        <div class="big">📦</div>
+        <div class="hint">Drag &amp; drop the export zip, or <span class="pick">choose a file</span></div>
+      </div>
+      <div class="status" id="status"></div>
+      <div class="note">Works with iOS and Android exports. Voice notes (.opus) play in Chrome, Firefox and Edge. If you exported “without media”, attachments show as placeholders.</div>
+    </div>
+    <input type="file" id="fileInput" accept=".zip" class="hidden">
+  </div>
+
+  <!-- Chat -->
+  <div class="chat hidden" id="chat"></div>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <span class="close" id="lightboxClose">&times;</span>
+    <img id="lightboxImg" alt="">
+  </div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Element refs
+============================================================ */
+const els = {
+  landing: document.getElementById('landing'),
+  dropzone: document.getElementById('dropzone'),
+  fileInput: document.getElementById('fileInput'),
+  status: document.getElementById('status'),
+  chat: document.getElementById('chat'),
+  appbar: document.getElementById('appbar'),
+  chatTitle: document.getElementById('chatTitle'),
+  chatSubtitle: document.getElementById('chatSubtitle'),
+  avatar: document.getElementById('avatar'),
+  meSelect: document.getElementById('meSelect'),
+  search: document.getElementById('search'),
+  resetBtn: document.getElementById('resetBtn'),
+  lightbox: document.getElementById('lightbox'),
+  lightboxImg: document.getElementById('lightboxImg'),
+  lightboxClose: document.getElementById('lightboxClose'),
+};
+
+let STATE = { messages: [], media: {}, participants: [], me: '', title: 'Chat' };
+
+/* ============================================================
+   File type helpers
+============================================================ */
+const MIME = {
+  jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp',
+  mp4:'video/mp4', '3gp':'video/3gpp', mov:'video/quicktime', mkv:'video/x-matroska', webm:'video/webm',
+  opus:'audio/ogg', ogg:'audio/ogg', mp3:'audio/mpeg', m4a:'audio/mp4', aac:'audio/aac',
+  wav:'audio/wav', amr:'audio/amr',
+  pdf:'application/pdf'
+};
+const IMG_EXT = ['jpg','jpeg','png','gif','webp'];
+const VID_EXT = ['mp4','3gp','mov','mkv','webm'];
+const AUD_EXT = ['opus','ogg','mp3','m4a','aac','wav','amr'];
+
+const ext = n => (n.split('.').pop() || '').toLowerCase();
+const base = n => n.split('/').pop().split('\\').pop();
+function mediaKind(name){
+  const e = ext(name);
+  if (IMG_EXT.includes(e)) return 'image';
+  if (VID_EXT.includes(e)) return 'video';
+  if (AUD_EXT.includes(e)) return 'audio';
+  return 'doc';
+}
+function humanSize(bytes){
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(0) + ' KB';
+  return (bytes/1048576).toFixed(1) + ' MB';
+}
+
+/* ============================================================
+   Parser
+============================================================ */
+const MARKS = /[\u200e\u200f\u202a-\u202e\u00a0]/g;
+
+// Detect a line that starts a new message. Handles iOS [..] and Android date - form.
+function parseHeader(rawLine){
+  const line = rawLine.replace(/^\u200e/, '');
+  // iOS: [12/01/2023, 14:30:22] rest   or  [2023-01-12, 2:30:22 PM] rest
+  let m = line.match(/^\[(\d{1,4}[\/.\-]\d{1,2}[\/.\-]\d{1,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?)\]\s?([\s\S]*)$/);
+  if (m) return { date:m[1], time:m[2], rest:m[3] };
+  // Android: 12/01/2023, 14:30 - rest   or  1/12/23, 2:30 PM - rest
+  m = line.match(/^(\d{1,4}[\/.\-]\d{1,2}[\/.\-]\d{1,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?)\s+[-–]\s+([\s\S]*)$/);
+  if (m) return { date:m[1], time:m[2], rest:m[3] };
+  return null;
+}
+
+function splitSender(rest){
+  // A sender is short and has no line breaks before the colon.
+  const m = rest.match(/^([^:\n]{1,80}?):\s([\s\S]*)$/);
+  if (m) return { sender:m[1].trim(), body:m[2] };
+  return { sender:null, body:rest };
+}
+
+function extractMedia(body){
+  // iOS: <attached: FILENAME>
+  let m = body.match(/<attached:\s*([^>]+?)>/i);
+  if (m) return { filename: base(m[1].trim()), caption: body.replace(m[0], '').trim() };
+  // Android: FILENAME (file attached)
+  m = body.match(/^([^\n]+?)\s*\(file attached\)/i);
+  if (m) return { filename: base(m[1].trim()), caption: body.slice(m[0].length).trim() };
+  return null;
+}
+
+function isOmitted(body){
+  return /<Media omitted>/i.test(body) ||
+         /\b(image|video|audio|sticker|GIF|document|Contact card) omitted\b/i.test(body);
+}
+
+function parseChat(text){
+  const lines = text.split(/\r?\n/);
+  const msgs = [];
+  for (const raw of lines){
+    const h = parseHeader(raw);
+    if (h){
+      const { sender, body } = splitSender(h.rest);
+      msgs.push({ date:h.date, time:h.time, sender, body });
+    } else if (msgs.length){
+      msgs[msgs.length - 1].body += '\n' + raw;
+    }
+  }
+  // Post-process
+  for (const msg of msgs){
+    let body = (msg.body || '').replace(MARKS, '').replace(/[ \t]+$/,'');
+    msg.media = extractMedia(body);
+    if (msg.media){
+      msg.text = msg.media.caption;
+    } else if (isOmitted(body)){
+      msg.omitted = true;
+      msg.text = '';
+    } else {
+      msg.text = body.trim();
+    }
+    msg.system = !msg.sender;
+  }
+  return msgs;
+}
+
+/* ============================================================
+   Load zip
+============================================================ */
+async function handleZip(file){
+  setStatus('Reading ' + file.name + ' …');
+  let zip;
+  try {
+    zip = await JSZip.loadAsync(file);
+  } catch(e){
+    return setStatus('That doesn’t look like a valid zip file.', true);
+  }
+
+  const entries = Object.values(zip.files).filter(f => !f.dir);
+  const txtEntries = entries.filter(f => /\.txt$/i.test(f.name));
+  if (!txtEntries.length){
+    return setStatus('No .txt chat log found inside the zip.', true);
+  }
+  // Prefer _chat.txt, else the largest txt
+  txtEntries.sort((a,b) =>
+    (/(^|\/)_chat\.txt$/i.test(b.name)?1:0) - (/(^|\/)_chat\.txt$/i.test(a.name)?1:0)
+    || (b._data.uncompressedSize||0) - (a._data.uncompressedSize||0)
+  );
+  const txtEntry = txtEntries[0];
+
+  setStatus('Parsing conversation …');
+  const text = await txtEntry.async('string');
+  const messages = parseChat(text);
+
+  // Build media map (basename -> {url,size,name})
+  setStatus('Loading media …');
+  const media = {};
+  const mediaEntries = entries.filter(f => f !== txtEntry);
+  for (const f of mediaEntries){
+    const name = base(f.name);
+    try {
+      const buf = await f.async('arraybuffer');
+      const type = MIME[ext(name)] || 'application/octet-stream';
+      const url = URL.createObjectURL(new Blob([buf], { type }));
+      media[name] = { url, size: buf.byteLength, name };
+    } catch(e){ /* skip unreadable entry */ }
+  }
+
+  // Participants
+  const participants = [...new Set(messages.filter(m=>m.sender).map(m=>m.sender))];
+
+  // Title guess
+  let title = base(txtEntry.name).replace(/\.txt$/i,'');
+  const wa = title.match(/WhatsApp Chat (?:with|-)\s*(.+)/i);
+  if (wa) title = wa[1].trim();
+  else if (/^_chat$/i.test(title)) title = participants.length <= 2 ? participants.join(' & ') || 'Chat' : 'Group chat';
+
+  STATE = { messages, media, participants, title, me: guessMe(participants, messages) };
+  render();
+  showChat();
+  const withMedia = Object.keys(media).length;
+  setStatus('');
+}
+
+// A light heuristic: WhatsApp exports list the phone owner second in many 2-person chats,
+// but there's no reliable marker — default to the participant who sent the LAST message,
+// which is often "you" replying. User can change it anyway.
+function guessMe(parts, msgs){
+  if (parts.length !== 2) return '';
+  for (let i = msgs.length - 1; i >= 0; i--){
+    if (msgs[i].sender) return msgs[i].sender;
+  }
+  return '';
+}
+
+/* ============================================================
+   Render
+============================================================ */
+const NAME_COLORS = ['#e542a3','#00a884','#ff8c00','#6bcbef','#a45cff','#d9822b',
+                     '#3f9dd6','#e0483e','#7d8c00','#009688','#b06a00','#c552b0'];
+const colorFor = (() => {
+  const cache = {};
+  let i = 0;
+  return name => (cache[name] ??= NAME_COLORS[(i++) % NAME_COLORS.length]);
+})();
+
+function linkify(str){
+  const frag = document.createDocumentFragment();
+  const re = /(https?:\/\/[^\s]+)/g;
+  let last = 0, m;
+  while ((m = re.exec(str))){
+    if (m.index > last) frag.appendChild(document.createTextNode(str.slice(last, m.index)));
+    const a = document.createElement('a');
+    a.href = m[0]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = m[0];
+    frag.appendChild(a);
+    last = m.index + m[0].length;
+  }
+  if (last < str.length) frag.appendChild(document.createTextNode(str.slice(last)));
+  return frag;
+}
+
+function buildMedia(msg){
+  const wrap = document.createElement('div');
+  const found = msg.media && STATE.media[msg.media.filename];
+
+  if (msg.omitted){
+    const span = document.createElement('span');
+    span.className = 'missing';
+    span.textContent = '📎 media omitted from export';
+    wrap.appendChild(span);
+    return wrap;
+  }
+  if (!found){
+    const span = document.createElement('span');
+    span.className = 'missing';
+    span.textContent = '📎 ' + (msg.media ? msg.media.filename : 'attachment') + ' (not in zip)';
+    wrap.appendChild(span);
+    return wrap;
+  }
+
+  const kind = mediaKind(found.name);
+  if (kind === 'image'){
+    const img = document.createElement('img');
+    img.className = 'media-img'; img.loading = 'lazy'; img.src = found.url;
+    img.addEventListener('click', () => openLightbox(found.url));
+    wrap.appendChild(img);
+  } else if (kind === 'video'){
+    const v = document.createElement('video');
+    v.className = 'media-video'; v.controls = true; v.preload = 'metadata'; v.src = found.url;
+    wrap.appendChild(v);
+  } else if (kind === 'audio'){
+    const a = document.createElement('div');
+    a.className = 'audio-wrap';
+    const badge = document.createElement('div');
+    badge.className = 'voice-badge';
+    badge.textContent = ext(found.name) === 'opus' ? '🎤' : '🎵';
+    const audio = document.createElement('audio');
+    audio.controls = true; audio.preload = 'none'; audio.src = found.url;
+    a.appendChild(badge); a.appendChild(audio);
+    wrap.appendChild(a);
+    // download fallback for formats a browser may not decode (amr etc.)
+    const dl = document.createElement('a');
+    dl.href = found.url; dl.download = found.name;
+    dl.style.cssText = 'font-size:11.5px;color:var(--wa-link);display:inline-block;margin-top:2px;';
+    dl.textContent = 'download audio';
+    wrap.appendChild(dl);
+  } else {
+    const doc = document.createElement('a');
+    doc.className = 'doc'; doc.href = found.url; doc.download = found.name;
+    const e = ext(found.name).toUpperCase() || 'FILE';
+    doc.innerHTML =
+      '<span class="ico">📄</span>' +
+      '<span class="info"><span class="name"></span>' +
+      '<span class="sub">' + e + ' · ' + humanSize(found.size) + '</span></span>' +
+      '<span class="dl">⬇</span>';
+    doc.querySelector('.name').textContent = found.name;
+    wrap.appendChild(doc);
+  }
+  return wrap;
+}
+
+function render(){
+  const me = STATE.me;
+  const q = els.search.value.trim().toLowerCase();
+  els.chat.innerHTML = '';
+  let lastDate = null;
+  const frag = document.createDocumentFragment();
+  let shown = 0;
+
+  for (const msg of STATE.messages){
+    // search filter
+    if (q){
+      const hay = ((msg.sender||'') + ' ' + (msg.text||'') + ' ' + (msg.media?msg.media.filename:'')).toLowerCase();
+      if (!hay.includes(q)) continue;
+    }
+
+    if (msg.date !== lastDate && !q){
+      const sep = document.createElement('div');
+      sep.className = 'date-sep';
+      const s = document.createElement('span'); s.textContent = msg.date;
+      sep.appendChild(s); frag.appendChild(sep);
+      lastDate = msg.date;
+    }
+
+    const row = document.createElement('div');
+    const isOut = !msg.system && me && msg.sender === me;
+    row.className = 'row ' + (msg.system ? 'sys' : isOut ? 'out' : 'in');
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    if (!msg.system) bubble.classList.add(isOut ? 'tail-out' : 'tail-in');
+
+    // sender name for incoming group messages
+    if (!msg.system && !isOut && STATE.participants.length > 2){
+      const s = document.createElement('span');
+      s.className = 'sender'; s.style.color = colorFor(msg.sender);
+      s.textContent = msg.sender;
+      bubble.appendChild(s);
+    }
+
+    if (msg.media || msg.omitted){
+      bubble.appendChild(buildMedia(msg));
+      if (msg.text){
+        const cap = document.createElement('div');
+        cap.className = 'body-text caption';
+        cap.appendChild(linkify(msg.text));
+        bubble.appendChild(cap);
+      }
+    } else if (msg.text){
+      const t = document.createElement('div');
+      t.className = 'body-text';
+      t.appendChild(linkify(msg.text));
+      bubble.appendChild(t);
+    }
+
+    if (!msg.system){
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = msg.time;
+      bubble.appendChild(meta);
+    }
+
+    row.appendChild(bubble);
+    frag.appendChild(row);
+    shown++;
+  }
+
+  if (shown === 0){
+    const empty = document.createElement('div');
+    empty.style.cssText = 'text-align:center;color:#54656f;margin-top:40px;font-size:14px;';
+    empty.textContent = q ? 'No messages match “' + els.search.value + '”.' : 'No messages found.';
+    frag.appendChild(empty);
+  }
+  els.chat.appendChild(frag);
+}
+
+/* ============================================================
+   UI wiring
+============================================================ */
+function showChat(){
+  els.landing.classList.add('hidden');
+  els.chat.classList.remove('hidden');
+  els.appbar.classList.remove('hidden');
+
+  els.chatTitle.textContent = STATE.title;
+  els.avatar.textContent = (STATE.title[0] || '💬').toUpperCase();
+  const n = STATE.participants.length;
+  els.chatSubtitle.textContent =
+    (n ? n + ' participant' + (n>1?'s':'') + ' · ' : '') + STATE.messages.length + ' messages';
+
+  // populate "you" selector
+  els.meSelect.innerHTML = '<option value="">— none —</option>';
+  for (const p of STATE.participants){
+    const o = document.createElement('option');
+    o.value = p; o.textContent = p;
+    if (p === STATE.me) o.selected = true;
+    els.meSelect.appendChild(o);
+  }
+  // scroll to bottom
+  requestAnimationFrame(() => { els.chat.scrollTop = els.chat.scrollHeight; });
+}
+
+function setStatus(msg, isErr){
+  els.status.textContent = msg;
+  els.status.classList.toggle('err', !!isErr);
+}
+
+function openLightbox(url){
+  els.lightboxImg.src = url;
+  els.lightbox.classList.add('open');
+}
+els.lightboxClose.addEventListener('click', () => els.lightbox.classList.remove('open'));
+els.lightbox.addEventListener('click', e => { if (e.target === els.lightbox) els.lightbox.classList.remove('open'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') els.lightbox.classList.remove('open'); });
+
+els.meSelect.addEventListener('change', () => { STATE.me = els.meSelect.value; render(); });
+let searchTimer;
+els.search.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(render, 180); });
+
+els.resetBtn.addEventListener('click', () => {
+  for (const k in STATE.media) URL.revokeObjectURL(STATE.media[k].url);
+  STATE = { messages: [], media: {}, participants: [], me:'', title:'Chat' };
+  els.chat.classList.add('hidden');
+  els.appbar.classList.add('hidden');
+  els.landing.classList.remove('hidden');
+  els.fileInput.value = '';
+  els.search.value = '';
+  setStatus('');
+});
+
+// drop zone
+els.dropzone.addEventListener('click', () => els.fileInput.click());
+els.fileInput.addEventListener('change', e => { if (e.target.files[0]) handleZip(e.target.files[0]); });
+['dragenter','dragover'].forEach(ev =>
+  els.dropzone.addEventListener(ev, e => { e.preventDefault(); els.dropzone.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev =>
+  els.dropzone.addEventListener(ev, e => { e.preventDefault(); els.dropzone.classList.remove('drag'); }));
+els.dropzone.addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0];
+  if (f && /\.zip$/i.test(f.name)) handleZip(f);
+  else setStatus('Please drop a .zip file.', true);
+});
+// allow dropping anywhere on landing
+els.landing.addEventListener('dragover', e => e.preventDefault());
+els.landing.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f && /\.zip$/i.test(f.name)) handleZip(f);
+});
+</script>
+</body>
+</html>

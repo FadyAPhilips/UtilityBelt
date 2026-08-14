@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0F172A;
+    --surface:   #1E293B;
+    --surface2:  #263348;
+    --border:    #334155;
+    --accent:    #38BDF8;
+    --accent-dim:#0EA5E9;
+    --text:      #F1F5F9;
+    --muted:     #94A3B8;
+    --correct:   #22C55E;
+    --wrong:     #EF4444;
+    --warn:      #F59E0B;
+    --radius:    12px;
+    --mono:      'JetBrains Mono', monospace;
+    --sans:      'Inter', sans-serif;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 16px 80px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    width: 100%;
+    max-width: 760px;
+    padding: 32px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  header p { font-size: 13px; color: var(--muted); }
+
+  /* ── PROGRESS BAR ── */
+  #progress-wrap { width: 100%; max-width: 760px; margin: 24px 0 0; }
+  #progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  #progress-track { height: 4px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+  #progress-fill  { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.35s ease; width: 0%; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; width: 100%; max-width: 760px; }
+  .screen.active { display: block; }
+
+  /* ── UPLOAD SCREEN ── */
+  #upload-screen { margin-top: 60px; display: none; flex-direction: column; align-items: center; gap: 20px; }
+  #upload-screen.active { display: flex; }
+
+  .drop-zone {
+    width: 100%;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 60px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: rgba(56,189,248,0.04); }
+  .drop-zone svg { color: var(--muted); margin-bottom: 16px; }
+  .drop-zone h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .drop-zone p  { font-size: 14px; color: var(--muted); }
+  .drop-zone span { color: var(--accent); }
+  #file-input { display: none; }
+
+  .format-box {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+  }
+  .format-box h3 { font-size: 12px; font-family: var(--mono); color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
+  .format-box pre { font-family: var(--mono); font-size: 12px; color: #7DD3FC; overflow-x: auto; line-height: 1.7; }
+
+  .error-msg {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #FCA5A5;
+    display: none;
+    width: 100%;
+  }
+
+  /* ── QUESTION SCREEN ── */
+  #question-screen { margin-top: 32px; }
+
+  .q-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    animation: fadeUp 0.25s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .q-eyebrow { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px; }
+  .q-text    { font-size: 18px; font-weight: 500; line-height: 1.55; margin-bottom: 28px; }
+
+  .options { display: flex; flex-direction: column; gap: 10px; }
+
+  .option {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    font-size: 15px;
+    line-height: 1.45;
+    user-select: none;
+  }
+  .option:hover   { border-color: var(--accent); background: rgba(56,189,248,0.06); }
+  .option.selected { border-color: var(--accent); background: rgba(56,189,248,0.1); }
+
+  .option-key {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    background: rgba(56,189,248,0.12);
+    border-radius: 5px;
+    padding: 2px 7px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .option.selected .option-key { background: var(--accent); color: var(--bg); }
+
+  /* ── NAV BAR (prev / next) ── */
+  .q-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 28px;
+    gap: 12px;
+  }
+  .q-nav-center {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    flex: 1;
+  }
+
+  /* ── QUESTION PALETTE ── */
+  .palette-wrap {
+    margin-top: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+  }
+  .palette-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .palette-header span {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .palette-legend {
+    display: flex;
+    gap: 14px;
+    font-size: 11px;
+    color: var(--muted);
+    align-items: center;
+  }
+  .palette-legend i {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .palette-legend .l-current  { background: var(--accent); }
+  .palette-legend .l-answered { background: rgba(56,189,248,0.25); border: 1px solid var(--accent); }
+  .palette-legend .l-empty    { background: var(--surface2); border: 1px solid var(--border); }
+  .palette-legend .l-flagged  { background: rgba(245,158,11,0.3); border: 1px solid var(--warn); }
+
+  .palette-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .palette-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .palette-btn:hover               { border-color: var(--accent); color: var(--text); }
+  .palette-btn.is-answered         { background: rgba(56,189,248,0.15); border-color: var(--accent); color: var(--accent); }
+  .palette-btn.is-current          { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .palette-btn.is-flagged          { border-color: var(--warn); color: var(--warn); }
+  .palette-btn.is-flagged.is-answered { background: rgba(245,158,11,0.15); border-color: var(--warn); color: var(--warn); }
+
+  /* ── FLAG CHECKBOX ── */
+  .flag-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    cursor: pointer;
+    width: fit-content;
+    user-select: none;
+  }
+  .flag-row input[type="checkbox"] { display: none; }
+  .flag-box {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: border-color 0.15s, background 0.15s;
+    font-size: 11px;
+  }
+  .flag-row:hover .flag-box { border-color: var(--warn); }
+  .flag-row.is-flagged .flag-box { background: rgba(245,158,11,0.2); border-color: var(--warn); }
+  .flag-label { font-size: 13px; color: var(--muted); transition: color 0.15s; }
+  .flag-row:hover .flag-label { color: var(--warn); }
+  .flag-row.is-flagged .flag-label { color: var(--warn); font-weight: 500; }
+
+  /* ── FLAG NOTE ── */
+  .flag-note-wrap {
+    display: none;
+    margin-top: 12px;
+    padding: 14px 16px;
+    background: rgba(245,158,11,0.06);
+    border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 10px;
+    animation: fadeUp 0.2s ease;
+  }
+  .flag-note-wrap.is-open { display: block; }
+  .flag-note-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--warn);
+    margin-bottom: 8px;
+  }
+  .flag-note-label span { font-weight: 400; color: var(--muted); font-size: 11px; }
+  .flag-note-input {
+    width: 100%;
+    min-height: 68px;
+    resize: vertical;
+    background: rgba(0,0,0,0.22);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13.5px;
+    line-height: 1.55;
+    transition: border-color 0.15s;
+  }
+  .flag-note-input::placeholder { color: var(--muted); opacity: 0.75; }
+  .flag-note-input:focus { outline: none; border-color: var(--warn); }
+
+  .flag-note-out {
+    margin-top: 6px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: #FCD34D;
+    max-width: 180px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* submit row */
+  .submit-row {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 24px;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s, transform 0.1s;
+    white-space: nowrap;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent); color: var(--bg); }
+  .btn-primary:hover { background: var(--accent-dim); }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); }
+  .btn-ghost:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-danger { background: rgba(239,68,68,0.15); color: #F87171; border: 1px solid rgba(239,68,68,0.3); }
+  .btn-danger:hover { background: rgba(239,68,68,0.25); }
+
+  /* ── RESULTS SCREEN ── */
+  #results-screen { margin-top: 32px; }
+
+  .score-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 36px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  .score-left h2 { font-size: 15px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+  .score-big { font-family: var(--mono); font-size: 56px; font-weight: 600; line-height: 1; }
+  .score-big.pass { color: var(--correct); }
+  .score-big.fail { color: var(--wrong); }
+  .score-big.mid  { color: var(--warn); }
+  .score-right { text-align: right; font-family: var(--mono); font-size: 13px; color: var(--muted); line-height: 1.9; }
+  .score-right strong { color: var(--text); }
+
+  .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .table-header h3 { font-size: 12px; font-family: var(--mono); color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+
+  .results-table { width: 100%; border-collapse: collapse; }
+  .results-table th {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .results-table td { padding: 14px 16px; font-size: 13.5px; line-height: 1.45; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .results-table tr:last-child td { border-bottom: none; }
+  .results-table tr.row-correct td { background: rgba(34,197,94,0.05); }
+  .results-table tr.row-wrong   td { background: rgba(239,68,68,0.05); }
+  .results-table tr.row-skip    td { background: rgba(245,158,11,0.05); }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
+  .badge-correct { background: rgba(34,197,94,0.15);  color: #4ADE80; }
+  .badge-wrong   { background: rgba(239,68,68,0.15);  color: #F87171; }
+  .badge-skip    { background: rgba(245,158,11,0.15); color: #FCD34D; }
+  .badge-written { background: rgba(56,189,248,0.15); color: #7DD3FC; }
+  .badge-flag    { background: rgba(245,158,11,0.2);  color: #FCD34D; }
+
+  /* ── CODE IN QUESTIONS / OPTIONS ── */
+  .code-block {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: #7DD3FC;
+    background: rgba(0,0,0,0.32);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    overflow-x: auto;
+    white-space: pre;
+    tab-size: 4;
+  }
+  .code-block code { font-family: inherit; background: none; padding: 0; color: inherit; }
+  .code-inline {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    color: #7DD3FC;
+    background: rgba(56,189,248,0.1);
+    border: 1px solid rgba(56,189,248,0.18);
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+  .option-body { flex: 1; min-width: 0; }
+  .option-body .code-block { margin: 8px 0 2px; font-size: 12.5px; }
+  .q-text .code-block { margin: 14px 0; }
+  /* results table: keep code compact */
+  .results-table .code-block { font-size: 12px; padding: 10px 12px; margin: 8px 0; }
+  .results-table .code-inline { font-size: 11.5px; white-space: normal; }
+
+  /* ── LONG ANSWER / EDITOR ── */
+  .longanswer-wrap { width: 100%; }
+
+  .editor-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .editor-modes {
+    display: inline-flex;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .editor-mode-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 5px 14px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .editor-mode-btn:hover { color: var(--text); }
+  .editor-mode-btn.active { background: var(--accent); color: var(--bg); }
+  .editor-hint { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  .editor-body {
+    display: flex;
+    width: 100%;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .editor-body:focus-within { border-color: var(--accent); background: rgba(56,189,248,0.05); }
+  .editor-body.is-code { background: rgba(0,0,0,0.28); }
+  .editor-body.is-code:focus-within { background: rgba(0,0,0,0.34); }
+
+  .editor-gutter {
+    flex-shrink: 0;
+    padding: 16px 10px 16px 14px;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--muted);
+    opacity: 0.55;
+    text-align: right;
+    user-select: none;
+    overflow: hidden;
+    border-right: 1px solid var(--border);
+    min-width: 44px;
+  }
+  .editor-gutter span { display: block; }
+
+  .longanswer-input {
+    flex: 1;
+    min-width: 0;
+    min-height: 200px;
+    resize: vertical;
+    background: transparent;
+    border: none;
+    padding: 16px 18px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.65;
+    overflow-y: hidden;
+  }
+  .longanswer-input:focus { outline: none; }
+  .longanswer-input::placeholder { color: var(--muted); opacity: 0.7; }
+  .longanswer-input.is-code {
+    font-size: 13.5px;
+    color: #BAE6FD;
+    tab-size: 4;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .q-type-tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 5px;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+  .q-type-tag.mcq     { background: rgba(56,189,248,0.12); color: var(--accent); }
+  .q-type-tag.written { background: rgba(245,158,11,0.15); color: #FCD34D; }
+
+  .q-num { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  .retry-row { margin-top: 28px; display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
+
+  /* ── LANDING PAGE ── */
+  .landing-hero { margin-top: 28px; margin-bottom: 4px; }
+  .landing-tagline { font-size: 15px; color: var(--muted); line-height: 1.65; max-width: 640px; }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 28px 0 12px;
+  }
+  .section-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 28px 0 12px;
+  }
+  .section-label-inline {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .steps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .steps-grid { grid-template-columns: 1fr; } }
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .step-num { font-family: var(--mono); font-size: 11px; color: var(--accent); font-weight: 600; margin-bottom: 8px; }
+  .step-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .step-body { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .step-body code { font-family: var(--mono); color: #7DD3FC; font-size: 12px; }
+  .step-body strong { color: var(--text); font-weight: 500; }
+
+  .btn-sm { padding: 7px 14px; font-size: 12px; }
+
+  /* format box additions */
+  .guide-intro { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+  .guide-intro code { font-family: var(--mono); color: #7DD3FC; font-size: 12px; }
+
+  .field-table { margin-bottom: 20px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .field-row { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+  .field-row-last { border-bottom: none; }
+  .field-name { font-family: var(--mono); font-size: 12px; color: var(--accent); padding: 10px 14px; min-width: 90px; background: rgba(56,189,248,0.05); flex-shrink: 0; }
+  .field-desc { font-size: 13px; color: var(--muted); padding: 10px 14px; line-height: 1.5; }
+  .field-desc code { font-family: var(--mono); color: #7DD3FC; font-size: 12px; }
+
+  .guide-section-title { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin: 18px 0 8px; }
+
+  .format-box pre { font-family: var(--mono); font-size: 12px; color: #7DD3FC; overflow-x: auto; line-height: 1.7; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 14px; }
+
+  .guide-rule {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .guide-rule code { font-family: var(--mono); color: #7DD3FC; font-size: 12px; }
+  .guide-rule em { color: var(--text); font-style: italic; }
+  .guide-rule-icon { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Test Platform</h1>
+  <p id="header-sub">Load a JSON file to begin your exam.</p>
+</header>
+
+<div id="progress-wrap" style="display:none">
+  <div id="progress-meta">
+    <span id="prog-label">Question 1 of ?</span>
+    <span id="prog-pct">0%</span>
+  </div>
+  <div id="progress-track"><div id="progress-fill"></div></div>
+</div>
+
+<!-- UPLOAD SCREEN -->
+<div id="upload-screen" class="screen active">
+
+  <div class="landing-hero">
+    <p class="landing-tagline">A self-contained exam platform for multiple-choice <em>and</em> written questions. Load a question file, answer at your own pace, and get a detailed results report you can hand to an AI for marking and explanation.</p>
+  </div>
+
+  <div class="section-label">How it works</div>
+  <div class="steps-grid">
+    <div class="step-card">
+      <div class="step-num">01</div>
+      <div class="step-title">Prepare a JSON file</div>
+      <div class="step-body">Write your questions in the JSON format described below, or ask an AI to generate them for you. Save with a <code>.json</code> extension.</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">02</div>
+      <div class="step-title">Load &amp; answer</div>
+      <div class="step-body">Drop your file below. Questions appear in order with shuffled options. Navigate freely with Previous / Next or jump via the question palette.</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">03</div>
+      <div class="step-title">Flag anything uncertain</div>
+      <div class="step-body">Use the <strong>Flag for review</strong> checkbox on any question — even ones you answered. Flagging opens a box where you can type a note or a specific question, which is included in your results file.</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">04</div>
+      <div class="step-title">Review &amp; download</div>
+      <div class="step-body">Submit to see your score and a full comparison table. Download a <code>.txt</code> results file pre-formatted to paste into an AI for explanations.</div>
+    </div>
+  </div>
+
+  <div class="section-label">Load your question file</div>
+  <div class="drop-zone" id="drop-zone">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    <h2>Drop your .json file here</h2>
+    <p>or <span id="browse-trigger">browse to upload</span></p>
+    <input type="file" id="file-input" accept=".json">
+  </div>
+  <div class="error-msg" id="error-msg"></div>
+
+  <div class="section-label-row">
+    <span class="section-label-inline">JSON file format</span>
+    <button class="btn btn-ghost btn-sm" id="download-guide-btn">&#8595; Download guide (.md)</button>
+  </div>
+  <div class="format-box">
+    <p class="guide-intro">Your file must be a <code>.json</code> file containing a single array of question objects. Each object has exactly three fields:</p>
+    <div class="field-table">
+      <div class="field-row"><span class="field-name">question</span><span class="field-desc">The question text shown to the user.</span></div>
+      <div class="field-row"><span class="field-name">options</span><span class="field-desc">An array of answer choices (minimum 2, no upper limit — supports True/False up to 26 options).</span></div>
+      <div class="field-row field-row-last"><span class="field-name">answer</span><span class="field-desc">The correct answer. Must match one entry in <code>options</code> exactly — same capitalization, spacing, and punctuation.</span></div>
+    </div>
+    <div class="guide-section-title">Standard multiple choice</div>
+    <pre>[
+  {
+    "question": "What does DNS stand for?",
+    "options": [
+      "Domain Name System",
+      "Data Network Service",
+      "Dynamic Node Server",
+      "Distributed Name Service"
+    ],
+    "answer": "Domain Name System"
+  }
+]</pre>
+    <div class="guide-section-title">True / False</div>
+    <pre>[
+  {
+    "question": "IPv6 addresses are 128 bits long.",
+    "options": ["True", "False"],
+    "answer": "True"
+  }
+]</pre>
+    <div class="guide-section-title">More than 4 options</div>
+    <pre>[
+  {
+    "question": "Which OSI layer is responsible for routing packets between networks?",
+    "options": [
+      "Physical", "Data Link", "Network",
+      "Transport", "Session", "Presentation", "Application"
+    ],
+    "answer": "Network"
+  }
+]</pre>
+    <div class="guide-section-title">Long / written answer (not auto-marked)</div>
+    <pre>[
+  {
+    "question": "Explain the difference between authentication and authorization.",
+    "type": "long"
+  },
+  {
+    "question": "Write a Django ORM query to get all students named Alice.",
+    "type": "long",
+    "answer": "Student.objects.filter(name='Alice')"
+  }
+]</pre>
+    <div class="guide-section-title">Code inside a question</div>
+    <pre>[
+  {
+    "question": "What is wrong with this view?\n\n```python\ndef student_list(request):\n    qs = Student.objects.all()\n    return render(request, \"list.html\", {\"student\": qs})\n```",
+    "options": [
+      "The context key should be `students`",
+      "`all()` returns nothing",
+      "`render()` needs a fourth argument"
+    ],
+    "answer": "The context key should be `students`"
+  }
+]</pre>
+    <div class="guide-rule"><span class="guide-rule-icon">&#128187;</span><span>Wrap code in <strong>triple backticks</strong> (optionally with a language, e.g. <code>```python</code>) to render it as a formatted code block, and single backticks for <code>`inline code`</code>. Works in questions, options, and answers. Inside JSON, newlines must be written as <code>\n</code> and any double quotes escaped as <code>\"</code>.</span></div>
+    <div class="guide-rule"><span class="guide-rule-icon">&#9998;</span><span>A question is treated as <em>written / long-answer</em> if it has <code>"type": "long"</code> or simply <strong>no <code>options</code></strong> field. It shows a text box instead of choices, is <em>not</em> auto-marked, and your typed response is captured in the downloadable results for an AI (or you) to mark. The <code>answer</code> field is optional here — include it as a reference/model answer if you like.</span></div>
+    <div class="guide-rule"><span class="guide-rule-icon">&#9000;</span><span>Written questions have <strong>Prose</strong> and <strong>Code</strong> editor modes (switchable at any time). Code mode gives you a line-number gutter, Tab / Shift+Tab indenting, auto-indent after <code>:</code> or an open bracket, and auto-closing brackets and quotes. The mode is auto-detected from the question, or you can force it with <code>"mode": "code"</code> or <code>"mode": "prose"</code>.</span></div>
+    <div class="guide-rule"><span class="guide-rule-icon">&#9888;</span><span>For multiple-choice questions, the <code>answer</code> value must be character-for-character identical to its matching entry in <code>options</code>. The file will be rejected if they do not match exactly.</span></div>
+    <div class="guide-rule"><span class="guide-rule-icon">&#128161;</span><span>Question numbers (Q1, Q2&hellip;) are assigned by position in the array. Keep this in mind when cross-referencing an answer key.</span></div>
+    <div class="guide-rule"><span class="guide-rule-icon">&#128161;</span><span>You can ask an AI to generate a question file. Paste your notes and say: <em>"Generate 20 MCQ questions in this JSON format: [{question, options[], answer}]"</em>.</span></div>
+  </div>
+
+</div>
+
+<!-- QUESTION SCREEN -->
+<div id="question-screen" class="screen">
+  <div class="q-card">
+    <div class="q-eyebrow" id="q-eyebrow">Question 1 of 10</div>
+    <div class="q-text" id="q-text"></div>
+    <div class="options" id="options-list"></div>
+    <label class="flag-row" id="flag-row">
+      <input type="checkbox" id="flag-checkbox">
+      <span class="flag-box" id="flag-box"></span>
+      <span class="flag-label">Flag for review</span>
+    </label>
+    <div class="flag-note-wrap" id="flag-note-wrap">
+      <label class="flag-note-label" for="flag-note">Note / question for review <span>(optional — included in your results file)</span></label>
+      <textarea class="flag-note-input" id="flag-note" placeholder="e.g. Why is B wrong here? I thought get() returned a QuerySet…"></textarea>
+    </div>
+    <div class="q-nav">
+      <button class="btn btn-ghost" id="prev-btn">← Previous</button>
+      <span class="q-nav-center" id="nav-status"></span>
+      <button class="btn btn-ghost" id="next-btn">Next →</button>
+    </div>
+  </div>
+
+  <!-- Question Palette -->
+  <div class="palette-wrap">
+    <div class="palette-header">
+      <span>Question Navigator</span>
+      <div class="palette-legend">
+        <span><i class="l-current"></i>Current</span>
+        <span><i class="l-answered"></i>Answered</span>
+        <span><i class="l-empty"></i>Unanswered</span>
+        <span><i class="l-flagged"></i>Flagged</span>
+      </div>
+    </div>
+    <div class="palette-grid" id="palette-grid"></div>
+    <div class="submit-row">
+      <button class="btn btn-danger" id="submit-btn">Submit Exam →</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS SCREEN -->
+<div id="results-screen" class="screen">
+  <div class="score-banner">
+    <div class="score-left">
+      <h2>Score <span style="font-size:11px;opacity:0.7">(multiple choice only)</span></h2>
+      <div class="score-big" id="score-display">—</div>
+    </div>
+    <div class="score-right" id="score-stats"></div>
+  </div>
+
+  <div class="table-header">
+    <h3>Answer Review</h3>
+  </div>
+  <table class="results-table">
+    <thead>
+      <tr>
+        <th style="width:42px">#</th>
+        <th>Question</th>
+        <th>Your Answer</th>
+        <th>Correct Answer</th>
+        <th style="width:70px">Flagged</th>
+        <th style="width:90px">Result</th>
+      </tr>
+    </thead>
+    <tbody id="results-tbody"></tbody>
+  </table>
+
+  <div class="retry-row">
+    <button class="btn btn-ghost" id="reload-btn">← Load New File</button>
+    <button class="btn btn-ghost" id="download-btn">↓ Download Results</button>
+    <button class="btn btn-primary" id="retry-btn">Retry Same Quiz</button>
+  </div>
+</div>
+
+<script>
+  // ── STATE ──
+  let questions    = [];
+  let rawQuestions = [];
+  let current      = 0;
+  let userAnswers  = [];
+  let userFlags    = [];
+  let flagNotes    = [];
+  let quizFileName = 'test';
+
+  const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+  // ── DOM ──
+  const uploadScreen   = document.getElementById('upload-screen');
+  const questionScreen = document.getElementById('question-screen');
+  const resultsScreen  = document.getElementById('results-screen');
+  const progressWrap   = document.getElementById('progress-wrap');
+  const headerSub      = document.getElementById('header-sub');
+  const dropZone       = document.getElementById('drop-zone');
+  const fileInput      = document.getElementById('file-input');
+  const errorMsg       = document.getElementById('error-msg');
+  const qEyebrow       = document.getElementById('q-eyebrow');
+  const qText          = document.getElementById('q-text');
+  const optionsList    = document.getElementById('options-list');
+  const prevBtn        = document.getElementById('prev-btn');
+  const nextBtn        = document.getElementById('next-btn');
+  const navStatus      = document.getElementById('nav-status');
+  const submitBtn      = document.getElementById('submit-btn');
+  const paletteGrid    = document.getElementById('palette-grid');
+  const flagRow        = document.getElementById('flag-row');
+  const flagCheckbox   = document.getElementById('flag-checkbox');
+  const flagBox        = document.getElementById('flag-box');
+  const flagNoteWrap   = document.getElementById('flag-note-wrap');
+  const flagNote       = document.getElementById('flag-note');
+  const scoreDisplay   = document.getElementById('score-display');
+  const scoreStats     = document.getElementById('score-stats');
+  const resultsTbody   = document.getElementById('results-tbody');
+  const retryBtn       = document.getElementById('retry-btn');
+  const reloadBtn      = document.getElementById('reload-btn');
+
+  // ── HELPERS ──
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function showScreen(name) {
+    [uploadScreen, questionScreen, resultsScreen].forEach(s => s.classList.remove('active'));
+    if (name === 'upload')   uploadScreen.classList.add('active');
+    if (name === 'question') questionScreen.classList.add('active');
+    if (name === 'results')  resultsScreen.classList.add('active');
+    progressWrap.style.display = name === 'question' ? 'block' : 'none';
+  }
+
+  function showError(msg) { errorMsg.textContent = msg; errorMsg.style.display = 'block'; }
+  function clearError()   { errorMsg.style.display = 'none'; }
+
+  // ── FILE HANDLING ──
+  document.getElementById('browse-trigger').addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+  function loadFile(file) {
+    clearError();
+    if (!file.name.endsWith('.json')) { showError('Please upload a .json file.'); return; }
+    quizFileName = file.name.replace(/\.json$/i, '');
+    const reader = new FileReader();
+    reader.onload = e => {
+      try { validateAndStart(JSON.parse(e.target.result)); }
+      catch { showError('Invalid JSON — could not parse the file.'); }
+    };
+    reader.readAsText(file);
+  }
+
+  function isLongQuestion(q) {
+    // A question is "long answer" if explicitly typed, or if it has no options array.
+    return q.type === 'long' || q.type === 'written' || !Array.isArray(q.options) || q.options.length === 0;
+  }
+
+  function validateAndStart(parsed) {
+    if (!Array.isArray(parsed) || parsed.length === 0) { showError('JSON must be a non-empty array of questions.'); return; }
+    for (let i = 0; i < parsed.length; i++) {
+      const q = parsed[i];
+      if (typeof q.question !== 'string')                   { showError(`Question ${i+1}: missing "question" field.`); return; }
+      if (isLongQuestion(q)) {
+        // Long-answer: no options required, no answer required. Nothing else to validate.
+        continue;
+      }
+      if (!Array.isArray(q.options) || q.options.length < 2){ showError(`Question ${i+1}: "options" must have at least 2 items (or omit "options" for a long-answer question).`); return; }
+      if (typeof q.answer !== 'string')                     { showError(`Question ${i+1}: missing "answer" field.`); return; }
+      if (!q.options.includes(q.answer))                    { showError(`Question ${i+1}: "answer" must exactly match one of the options.`); return; }
+    }
+    rawQuestions = parsed;
+    startQuiz();
+  }
+
+  function startQuiz() {
+    questions = rawQuestions.map((q, i) => {
+      const long = isLongQuestion(q);
+      return {
+        ...q,
+        originalNum: i + 1,
+        isLong: long,
+        shuffledOptions: long ? [] : shuffle(q.options)
+      };
+    });
+    current     = 0;
+    userAnswers = new Array(questions.length).fill(null);
+    userFlags   = new Array(questions.length).fill(false);
+    flagNotes   = new Array(questions.length).fill('');
+    editorModes = new Array(questions.length).fill(null);
+    headerSub.textContent = `${questions.length} questions loaded — good luck.`;
+    showScreen('question');
+    renderQuestion();
+  }
+
+  // ── QUIZ ──
+  function renderQuestion() {
+    const q     = questions[current];
+    const total = questions.length;
+
+    // progress bar
+    updateProgress();
+
+    // eyebrow + question (with type tag)
+    const typeTag = q.isLong
+      ? `<span class="q-type-tag written">Written</span>`
+      : `<span class="q-type-tag mcq">Multiple Choice</span>`;
+    qEyebrow.innerHTML = `Question ${current + 1} of ${total}${typeTag}`;
+    qText.innerHTML = `<span style="font-family:var(--mono);font-size:13px;color:var(--accent);margin-right:10px;">Q${q.originalNum}.</span>${formatText(q.question)}`;
+
+    // body: editor for long-answer, options for MCQ
+    optionsList.innerHTML = '';
+    if (q.isLong) {
+      optionsList.appendChild(buildAnswerEditor(q));
+    } else {
+      q.shuffledOptions.forEach((opt, i) => {
+        const div = document.createElement('div');
+        div.className = 'option' + (userAnswers[current] === opt ? ' selected' : '');
+        div.innerHTML = `<span class="option-key">${LETTERS[i]}</span><span class="option-body">${formatText(opt)}</span>`;
+        div.addEventListener('click', () => selectOption(opt, div));
+        optionsList.appendChild(div);
+      });
+    }
+
+    // nav buttons
+    prevBtn.disabled = current === 0;
+    nextBtn.textContent = current === total - 1 ? 'Last →' : 'Next →';
+    nextBtn.disabled = current === total - 1;
+
+    // center status
+    navStatus.textContent = isAnswered(current) ? 'Answered' : 'Not answered';
+    navStatus.style.color = isAnswered(current) ? 'var(--accent)' : 'var(--muted)';
+
+    // palette
+    renderPalette();
+
+    // flag checkbox + note
+    const isFlagged = userFlags[current];
+    flagCheckbox.checked = isFlagged;
+    flagBox.textContent  = isFlagged ? '⚑' : '';
+    flagRow.classList.toggle('is-flagged', isFlagged);
+    flagNoteWrap.classList.toggle('is-open', isFlagged);
+    flagNote.value = flagNotes[current] || '';
+  }
+
+  function renderPalette() {
+    paletteGrid.innerHTML = '';
+    questions.forEach((_, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'palette-btn';
+      btn.textContent = i + 1;
+      if (i === current)              btn.classList.add('is-current');
+      else if (isAnswered(i))         btn.classList.add('is-answered');
+      if (userFlags[i] && i !== current) btn.classList.add('is-flagged');
+      btn.addEventListener('click', () => { current = i; renderQuestion(); });
+      paletteGrid.appendChild(btn);
+    });
+  }
+
+  // An answer counts as given if: MCQ selection is non-null, OR long-answer text is non-empty.
+  function isAnswered(i) {
+    const a = userAnswers[i];
+    if (a === null || a === undefined) return false;
+    if (questions[i].isLong) return a.trim().length > 0;
+    return true;
+  }
+
+  function updateProgress() {
+    const answered = questions.reduce((n, _, i) => n + (isAnswered(i) ? 1 : 0), 0);
+    const total    = questions.length;
+    const pct = Math.round((answered / total) * 100);
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('prog-label').textContent = `${answered} of ${total} answered`;
+    document.getElementById('prog-pct').textContent = pct + '%';
+  }
+
+  function selectOption(value, el) {
+    userAnswers[current] = value;
+    document.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    navStatus.textContent = 'Answered';
+    navStatus.style.color = 'var(--accent)';
+    renderPalette();
+    updateProgress();
+  }
+
+  // ── ANSWER EDITOR (prose / code modes) ──
+  // Per-question editor mode; defaults to 'code' if the question looks code-oriented.
+  let editorModes = [];
+
+  function guessMode(q) {
+    if (q.mode === 'code' || q.mode === 'prose') return q.mode;
+    const t = (q.question || '') + ' ' + (q.answer || '');
+    return /```|\bwrite (a|the|an) .*(query|code|view|model|form|function|class|command)|ORM|\.objects\.|def |import |urlpatterns|SELECT /i.test(t)
+      ? 'code' : 'prose';
+  }
+
+  const PAIRS = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'" };
+
+  function buildAnswerEditor(q) {
+    const mode = editorModes[current] || (editorModes[current] = guessMode(q));
+
+    const wrap = document.createElement('div');
+    wrap.className = 'longanswer-wrap';
+
+    // toolbar
+    const bar = document.createElement('div');
+    bar.className = 'editor-bar';
+    bar.innerHTML = `
+      <div class="editor-modes">
+        <button class="editor-mode-btn${mode === 'prose' ? ' active' : ''}" data-mode="prose">Prose</button>
+        <button class="editor-mode-btn${mode === 'code'  ? ' active' : ''}" data-mode="code">Code</button>
+      </div>
+      <span class="editor-hint">${mode === 'code'
+        ? 'Tab indents · auto-indent · auto-closes brackets'
+        : 'Plain text answer'}</span>`;
+    wrap.appendChild(bar);
+
+    // editor body
+    const body = document.createElement('div');
+    body.className = 'editor-body' + (mode === 'code' ? ' is-code' : '');
+
+    const gutter = document.createElement('div');
+    gutter.className = 'editor-gutter';
+
+    const ta = document.createElement('textarea');
+    ta.className = 'longanswer-input' + (mode === 'code' ? ' is-code' : '');
+    ta.placeholder = mode === 'code' ? '# Write your code here…' : 'Type your answer here…';
+    ta.value = userAnswers[current] || '';
+    ta.spellcheck = mode !== 'code';
+    ta.setAttribute('autocapitalize', 'off');
+    ta.setAttribute('autocomplete', 'off');
+    ta.setAttribute('autocorrect', 'off');
+
+    function syncGutter() {
+      if (mode !== 'code') return;
+      const n = ta.value.split('\n').length;
+      gutter.innerHTML = Array.from({ length: n }, (_, i) => `<span>${i + 1}</span>`).join('');
+      gutter.scrollTop = ta.scrollTop;
+    }
+    function autoGrow() {
+      ta.style.height = 'auto';
+      ta.style.height = Math.max(200, ta.scrollHeight) + 'px';
+    }
+
+    ta.addEventListener('input', () => { setLongAnswer(ta.value); syncGutter(); autoGrow(); });
+    ta.addEventListener('scroll', () => { gutter.scrollTop = ta.scrollTop; });
+    if (mode === 'code') ta.addEventListener('keydown', e => handleCodeKeys(e, ta, syncGutter, autoGrow));
+
+    if (mode === 'code') body.appendChild(gutter);
+    body.appendChild(ta);
+    wrap.appendChild(body);
+
+    // mode switching
+    bar.querySelectorAll('.editor-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        editorModes[current] = btn.dataset.mode;
+        renderQuestion();
+        const nta = document.querySelector('.longanswer-input');
+        if (nta) { nta.focus(); nta.selectionStart = nta.selectionEnd = nta.value.length; }
+      });
+    });
+
+    setTimeout(() => { syncGutter(); autoGrow(); }, 0);
+    return wrap;
+  }
+
+  function handleCodeKeys(e, ta, syncGutter, autoGrow) {
+    const { selectionStart: s, selectionEnd: en, value: v } = ta;
+    const setVal = (nv, caret) => {
+      ta.value = nv;
+      ta.selectionStart = ta.selectionEnd = caret;
+      setLongAnswer(nv); syncGutter(); autoGrow();
+    };
+
+    // Tab / Shift+Tab — indent or outdent
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const lineStart = v.lastIndexOf('\n', s - 1) + 1;
+      if (e.shiftKey) {
+        const line = v.slice(lineStart, v.indexOf('\n', lineStart) === -1 ? v.length : v.indexOf('\n', lineStart));
+        const strip = line.startsWith('    ') ? 4 : line.startsWith(' ') ? 1 : 0;
+        if (strip) setVal(v.slice(0, lineStart) + v.slice(lineStart + strip), Math.max(lineStart, s - strip));
+      } else if (s !== en) {
+        // indent every selected line
+        const endLine = v.indexOf('\n', en) === -1 ? v.length : v.indexOf('\n', en);
+        const block = v.slice(lineStart, endLine).split('\n').map(l => '    ' + l).join('\n');
+        setVal(v.slice(0, lineStart) + block + v.slice(endLine), s + 4);
+      } else {
+        setVal(v.slice(0, s) + '    ' + v.slice(en), s + 4);
+      }
+      return;
+    }
+
+    // Enter — keep indentation, add a level after ':' or an open bracket
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const lineStart = v.lastIndexOf('\n', s - 1) + 1;
+      const line   = v.slice(lineStart, s);
+      const indent = (line.match(/^[ \t]*/) || [''])[0];
+      const extra  = /[:{[(]\s*$/.test(line) ? '    ' : '';
+      const ins    = '\n' + indent + extra;
+      setVal(v.slice(0, s) + ins + v.slice(en), s + ins.length);
+      return;
+    }
+
+    // Auto-close brackets and quotes
+    if (PAIRS[e.key] && s === en) {
+      const next = v[s] || '';
+      // don't auto-close a quote when typing inside a word
+      if ((e.key === '"' || e.key === "'") && /[\w"']/.test(next)) return;
+      e.preventDefault();
+      setVal(v.slice(0, s) + e.key + PAIRS[e.key] + v.slice(en), s + 1);
+      return;
+    }
+
+    // Typing a closing char right before the same char — step over it
+    if ([')', ']', '}', '"', "'"].includes(e.key) && s === en && v[s] === e.key) {
+      e.preventDefault();
+      ta.selectionStart = ta.selectionEnd = s + 1;
+      return;
+    }
+
+    // Backspace between an empty pair — delete both
+    if (e.key === 'Backspace' && s === en && s > 0 && PAIRS[v[s - 1]] === v[s]) {
+      e.preventDefault();
+      setVal(v.slice(0, s - 1) + v.slice(s + 1), s - 1);
+    }
+  }
+
+  function setLongAnswer(value) {
+    userAnswers[current] = value;
+    const answered = isAnswered(current);
+    navStatus.textContent = answered ? 'Answered' : 'Not answered';
+    navStatus.style.color = answered ? 'var(--accent)' : 'var(--muted)';
+    renderPalette();
+    updateProgress();
+  }
+
+  flagCheckbox.addEventListener('change', () => {
+    userFlags[current] = flagCheckbox.checked;
+    const isFlagged = userFlags[current];
+    flagBox.textContent = isFlagged ? '⚑' : '';
+    flagRow.classList.toggle('is-flagged', isFlagged);
+    flagNoteWrap.classList.toggle('is-open', isFlagged);
+    if (isFlagged) {
+      flagNote.value = flagNotes[current] || '';
+      setTimeout(() => flagNote.focus(), 120);
+    } else {
+      flagNotes[current] = '';   // clearing the flag clears its note
+      flagNote.value = '';
+    }
+    renderPalette();
+  });
+
+  flagNote.addEventListener('input', () => { flagNotes[current] = flagNote.value; });
+
+  prevBtn.addEventListener('click', () => { if (current > 0) { current--; renderQuestion(); } });
+  nextBtn.addEventListener('click', () => { if (current < questions.length - 1) { current++; renderQuestion(); } });
+  submitBtn.addEventListener('click', () => {
+    const unanswered = questions.reduce((n, _, i) => n + (isAnswered(i) ? 0 : 1), 0);
+    if (unanswered > 0) {
+      const go = confirm(`You have ${unanswered} unanswered question${unanswered > 1 ? 's' : ''}. Submit anyway?`);
+      if (!go) return;
+    }
+    showResults();
+  });
+
+  // ── RESULTS ──
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // Renders question/option text with Markdown-style code support:
+  //   ```lang\n ... \n```  → block code
+  //   `inline`             → inline code
+  // Everything else is HTML-escaped, so code shows literally and is XSS-safe.
+  function formatText(str) {
+    const src = String(str ?? '');
+    let out = '';
+    let last = 0;
+    const fence = /```[ \t]*([A-Za-z0-9_+-]*)[ \t]*\r?\n([\s\S]*?)```/g;
+    let m;
+    while ((m = fence.exec(src)) !== null) {
+      out += inlineFormat(src.slice(last, m.index));
+      out += `<pre class="code-block"><code>${escapeHtml(m[2].replace(/\s+$/, ''))}</code></pre>`;
+      last = fence.lastIndex;
+    }
+    out += inlineFormat(src.slice(last));
+    return out;
+  }
+
+  function inlineFormat(chunk) {
+    // escape first, then swap `code` spans and newlines
+    return escapeHtml(chunk)
+      .replace(/`([^`\n]+)`/g, '<code class="code-inline">$1</code>')
+      .replace(/\r?\n/g, '<br>');
+  }
+
+  // Plain-text version (for the downloaded results file) — strips fences/backticks
+  function plainText(str) {
+    return String(str ?? '')
+      .replace(/```[ \t]*[A-Za-z0-9_+-]*[ \t]*\r?\n?/g, '')
+      .replace(/```/g, '');
+  }
+
+  // Flag column in the results table: badge, plus the note as a tooltip/caption.
+  function flagCell(i) {
+    if (!userFlags[i]) return '';
+    const note = (flagNotes[i] || '').trim();
+    const badge = '<span class="badge badge-flag">⚑</span>';
+    if (!note) return badge;
+    return `${badge}<div class="flag-note-out" title="${escapeHtml(note)}">${escapeHtml(note)}</div>`;
+  }
+
+  function showResults() {
+    resultsTbody.innerHTML = '';
+
+    let mcqTotal = 0, correct = 0, mcqSkipped = 0;   // MCQ-only scoring
+    let longTotal = 0, longAnswered = 0, longSkipped = 0;
+
+    questions.forEach((q, i) => {
+      const ua = userAnswers[i];
+      const tr = document.createElement('tr');
+
+      if (q.isLong) {
+        longTotal++;
+        const answered = isAnswered(i);
+        if (answered) longAnswered++; else longSkipped++;
+
+        const rowClass = answered ? '' : 'row-skip';
+        const badge = answered
+          ? `<span class="badge badge-written">✎ Written</span>`
+          : `<span class="badge badge-skip">⟳ Skipped</span>`;
+        const yourText = answered
+          ? (editorModes[i] === 'code'
+              ? `<pre class="code-block"><code>${escapeHtml(ua)}</code></pre>`
+              : `<span style="white-space:pre-wrap">${escapeHtml(ua)}</span>`)
+          : '—';
+
+        tr.className = rowClass;
+        tr.innerHTML = `
+          <td class="q-num">Q${q.originalNum}</td>
+          <td>${formatText(q.question)}</td>
+          <td style="color:${answered ? 'var(--text)' : 'var(--muted)'}">${yourText}</td>
+          <td style="color:var(--muted)"><em>needs marking</em></td>
+          <td>${flagCell(i)}</td>
+          <td>${badge}</td>`;
+        resultsTbody.appendChild(tr);
+        return;
+      }
+
+      // MCQ
+      mcqTotal++;
+      const isSkip    = ua === null;
+      const isCorrect = !isSkip && ua === q.answer;
+      if (isCorrect) correct++;
+      if (isSkip)    mcqSkipped++;
+
+      const rowClass = isSkip ? 'row-skip' : isCorrect ? 'row-correct' : 'row-wrong';
+      const badge    = isSkip
+        ? `<span class="badge badge-skip">⟳ Skipped</span>`
+        : isCorrect
+          ? `<span class="badge badge-correct">✓ Correct</span>`
+          : `<span class="badge badge-wrong">✗ Wrong</span>`;
+
+      tr.className = rowClass;
+      tr.innerHTML = `
+        <td class="q-num">Q${q.originalNum}</td>
+        <td>${formatText(q.question)}</td>
+        <td style="color:${isSkip ? 'var(--muted)' : isCorrect ? 'var(--correct)' : 'var(--wrong)'}">${ua != null ? formatText(ua) : '—'}</td>
+        <td style="color:var(--correct)">${formatText(q.answer)}</td>
+        <td>${flagCell(i)}</td>
+        <td>${badge}</td>`;
+      resultsTbody.appendChild(tr);
+    });
+
+    const wrong = mcqTotal - correct - mcqSkipped;
+
+    // Score % is based on MCQs only (long answers aren't auto-marked)
+    if (mcqTotal > 0) {
+      const pct = Math.round((correct / mcqTotal) * 100);
+      scoreDisplay.textContent = pct + '%';
+      scoreDisplay.className   = 'score-big ' + (pct >= 70 ? 'pass' : pct >= 50 ? 'mid' : 'fail');
+    } else {
+      scoreDisplay.textContent = '—';
+      scoreDisplay.className   = 'score-big mid';
+    }
+
+    let statsHtml = '';
+    if (mcqTotal > 0) {
+      statsHtml += `<strong>${correct}</strong> correct<br><strong>${wrong}</strong> wrong<br><strong>${mcqSkipped}</strong> skipped<br><strong>${mcqTotal}</strong> MCQ total`;
+    }
+    if (longTotal > 0) {
+      if (statsHtml) statsHtml += '<br><br>';
+      statsHtml += `<span style="color:var(--warn)"><strong>${longTotal}</strong> written</span><br><strong>${longAnswered}</strong> answered<br><strong>${longSkipped}</strong> blank`;
+    }
+    scoreStats.innerHTML = statsHtml;
+
+    document.getElementById('progress-fill').style.width = '100%';
+    document.getElementById('prog-label').textContent    = 'Complete';
+    document.getElementById('prog-pct').textContent      = '100%';
+    progressWrap.style.display = 'block';
+    showScreen('results');
+  }
+
+
+  // ── DOWNLOAD GUIDE ──
+  const GUIDE_MD = `# Test Platform — How to Write Question JSON Files
+
+Supports **multiple-choice** and **written / long-answer** questions in the same file.
+
+## File Format
+
+Your file must be a \`.json\` file containing a single array (\`[...]\`) of question objects.
+
+\`\`\`json
+[
+  { ...question 1... },
+  { ...question 2... },
+  { ...question 3... }
+]
+\`\`\`
+
+---
+
+## Question Structure
+
+| Field    | Type             | Required?    | Description                                                       |
+|----------|------------------|--------------|-------------------------------------------------------------------|
+| question | string           | always       | The question text shown to the user                               |
+| options  | array of strings | MCQ only     | The choices (min. 2, no upper limit). Omit for written questions. |
+| answer   | string           | MCQ only     | Must exactly match one entry in options. Optional for written Qs. |
+| type     | string           | written only | Set to \`"long"\` to force a written question                         |
+| mode     | string           | optional     | \`"code"\` or \`"prose"\` — editor mode for written questions           |
+
+\`\`\`json
+{
+  "question": "Your question text?",
+  "options": ["Choice A", "Choice B", "Choice C", "Choice D"],
+  "answer": "Choice C"
+}
+\`\`\`
+
+---
+
+## Rules
+
+1. For MCQ, the answer must exactly match one of the options — character for character (capitalization, spacing, punctuation).
+2. MCQ needs at least 2 options. There is no upper limit (up to 26, labeled A–Z).
+3. A question is **written / long-answer** if it has \`"type": "long"\` **or** simply has no \`options\` field.
+4. Questions are numbered by their position in the array (Q1 = first item, Q2 = second, etc.).
+5. Do not pre-shuffle options — the app shuffles them at runtime.
+
+---
+
+## Question Types
+
+### Standard multiple choice
+\`\`\`json
+{
+  "question": "What does DNS stand for?",
+  "options": ["Domain Name System", "Data Network Service", "Dynamic Node Server", "Distributed Name Service"],
+  "answer": "Domain Name System"
+}
+\`\`\`
+
+### True / False
+\`\`\`json
+{
+  "question": "IPv6 addresses are 128 bits long.",
+  "options": ["True", "False"],
+  "answer": "True"
+}
+\`\`\`
+
+### More than 4 options
+\`\`\`json
+{
+  "question": "Which OSI layer handles routing?",
+  "options": ["Physical", "Data Link", "Network", "Transport", "Session", "Presentation", "Application"],
+  "answer": "Network"
+}
+\`\`\`
+
+### Long / written answer (not auto-marked)
+A question is treated as long-answer if it has \`"type": "long"\` **or** simply has no \`options\` field. It shows a text box instead of choices, is not scored automatically, and your typed response is captured in the downloadable results file for marking. The \`answer\` field is optional (use it for a reference/model answer).
+
+\`\`\`json
+[
+  {
+    "question": "Explain the difference between authentication and authorization.",
+    "type": "long"
+  },
+  {
+    "question": "Write a Django ORM query to get all students named Alice.",
+    "type": "long",
+    "answer": "Student.objects.filter(name='Alice')"
+  }
+]
+\`\`\`
+
+---
+
+## Code Formatting in Questions
+
+Wrap code in **triple backticks** (optionally with a language tag) to render it as a formatted code block, and single backticks for \`inline code\`. This works in \`question\`, \`options\`, and \`answer\`.
+
+Inside JSON, newlines must be written as \\n and inner double quotes escaped as \\".
+
+\`\`\`json
+[
+  {
+    "question": "What is wrong with this view?\\n\\n\`\`\`python\\ndef student_list(request):\\n    qs = Student.objects.all()\\n    return render(request, \\"list.html\\", {\\"student\\": qs})\\n\`\`\`",
+    "options": [
+      "The context key should be \`students\`",
+      "\`all()\` returns nothing by default",
+      "\`render()\` needs a fourth argument"
+    ],
+    "answer": "The context key should be \`students\`"
+  }
+]
+\`\`\`
+
+---
+
+## Editor Modes for Written Answers
+
+Written questions have **Prose** and **Code** editor modes, switchable at any time while answering.
+
+Code mode provides a line-number gutter, Tab / Shift+Tab indenting, auto-indent after \`:\` or an open bracket, and auto-closing brackets and quotes.
+
+The mode is auto-detected from the question text, or you can force it:
+
+\`\`\`json
+[
+  {
+    "question": "Write a Django ORM query to get all students named Alice.",
+    "type": "long",
+    "mode": "code"
+  },
+  {
+    "question": "Explain the difference between authentication and authorization.",
+    "type": "long",
+    "mode": "prose"
+  }
+]
+\`\`\`
+
+---
+
+## Flagging & Notes
+
+While answering, any question can be flagged with the **Flag for review** checkbox. Flagging opens a text box where you can type a note or a specific question (for example: *"Why is B wrong? I thought get() returned a QuerySet."*).
+
+Flagged questions are highlighted in the question navigator, and both the flag and your note are written into the downloaded results file so whoever marks it can answer you directly. Unflagging a question clears its note.
+
+---
+
+## Results File
+
+Submitting shows your score (multiple choice only — written answers are not auto-marked) and a full review table.
+
+**Download Results** saves a \`.txt\` file named after your question file: uploading \`week6.json\` produces \`week6_results.txt\`. The file contains every question, your answer, the correct answer for MCQs, your written answers (fenced as code when you used code mode), and any flag notes — formatted to paste straight into an AI for marking.
+
+---
+
+## Tips
+
+- Use a text editor with JSON syntax highlighting (e.g. VS Code) — it catches missing commas and brackets.
+- Every question object needs a comma after its closing } except the last one.
+- You can ask an AI to generate questions. Paste your notes and give it this format spec.
+- Question numbers are stable — Q1 is always the first item in your array regardless of display order.
+- Written answers are not auto-marked; they are captured in the downloadable results for you or an AI to mark.
+`;
+
+  document.getElementById('download-guide-btn').addEventListener('click', () => {
+    const blob = new Blob([GUIDE_MD], { type: 'text/markdown' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'test-platform-json-guide.md';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  retryBtn.addEventListener('click', startQuiz);
+  reloadBtn.addEventListener('click', () => {
+    fileInput.value = '';
+    clearError();
+    headerSub.textContent = 'Load a JSON file to begin your exam.';
+    showScreen('upload');
+  });
+
+  // Writes the question header + body into the results file, keeping any
+  // multi-line code in the question readable (indented under the header).
+  // Writes the flag marker and, if present, the user's note for that question.
+  function pushFlagNote(lines, i) {
+    const note = (flagNotes[i] || '').trim();
+    if (note) {
+      lines.push(`  ⚑ FLAGGED — my note/question:`);
+      note.split('\n').forEach(l => lines.push(`      ${l}`));
+    } else {
+      lines.push(`  ⚑ Flagged for review — please explain this question in detail.`);
+    }
+  }
+
+  function pushQuestionText(lines, q, status, isFlagged) {
+    const header = `Q${q.originalNum}. [${status}]${isFlagged ? ' [FLAGGED FOR REVIEW]' : ''}`;
+    const body   = String(q.question ?? '');
+    if (body.includes('\n')) {
+      lines.push(header, '');
+      body.split('\n').forEach(l => lines.push(`  ${l}`));
+      lines.push('');
+    } else {
+      lines.push(`${header} ${body}`, '');
+    }
+  }
+
+  document.getElementById('download-btn').addEventListener('click', () => {
+    // MCQ-only scoring
+    const mcqs      = questions.filter(q => !q.isLong);
+    const longs     = questions.filter(q => q.isLong);
+    const mcqTotal  = mcqs.length;
+    const correct   = questions.filter((q, i) => !q.isLong && userAnswers[i] === q.answer).length;
+    const mcqSkip   = questions.filter((q, i) => !q.isLong && userAnswers[i] === null).length;
+    const wrong     = mcqTotal - correct - mcqSkip;
+    const pct       = mcqTotal > 0 ? Math.round((correct / mcqTotal) * 100) : null;
+
+    const lines = [
+      'EXAM RESULTS',
+      '='.repeat(60),
+    ];
+    if (mcqTotal > 0) {
+      lines.push(`MCQ Score: ${pct}% (${correct} correct, ${wrong} wrong, ${mcqSkip} skipped, ${mcqTotal} MCQ total)`);
+    }
+    if (longs.length > 0) {
+      const answered = questions.filter((q, i) => q.isLong && isAnswered(i)).length;
+      lines.push(`Written questions: ${longs.length} (${answered} answered, ${longs.length - answered} blank) — NOT auto-marked, need your review.`);
+    }
+    lines.push(
+      '',
+      'INSTRUCTIONS FOR THE AI MARKING THIS:',
+      '  - For MULTIPLE CHOICE questions: confirm right/wrong, explain why the',
+      '    correct answer is right, why my answer was wrong (if applicable), and',
+      '    the key concept.',
+      '  - For WRITTEN questions: mark my typed answer, point out anything missing',
+      '    or incorrect, and give the model answer.',
+      '  - Pay special attention to any question marked [FLAGGED FOR REVIEW].',
+      '    Where I left a note under a flag, answer that note specifically.',
+      '',
+      '='.repeat(60),
+      ''
+    );
+
+    questions.forEach((q, i) => {
+      const ua        = userAnswers[i];
+      const isFlagged = userFlags[i];
+
+      if (q.isLong) {
+        const answered = isAnswered(i);
+        const status   = answered ? 'WRITTEN — NEEDS MARKING' : 'BLANK';
+        const isCode   = editorModes[i] === 'code';
+        pushQuestionText(lines, q, status, isFlagged);
+        lines.push(`  My answer${isCode ? ' (code)' : ''}:`);
+        if (answered) {
+          if (isCode) lines.push('    ```');
+          ua.split('\n').forEach(l => lines.push(`    ${l}`));
+          if (isCode) lines.push('    ```');
+        } else {
+          lines.push('    (left blank)');
+        }
+        if (typeof q.answer === 'string' && q.answer.length) {
+          lines.push('', '  Reference/model answer (from file):');
+          q.answer.split('\n').forEach(l => lines.push(`    ${l}`));
+        }
+        if (isFlagged) pushFlagNote(lines, i);
+        lines.push('', '-'.repeat(60), '');
+        return;
+      }
+
+      // MCQ
+      const isSkip    = ua === null;
+      const isCorrect = !isSkip && ua === q.answer;
+      const status    = isSkip ? 'SKIPPED' : isCorrect ? 'CORRECT' : 'WRONG';
+      pushQuestionText(lines, q, status, isFlagged);
+      q.shuffledOptions.forEach((opt, oi) => {
+        const letter    = LETTERS[oi];
+        const isAnswer  = opt === q.answer;
+        const isChosen  = opt === ua;
+        const marker    = (isAnswer && isChosen) ? '✓  ' : isChosen ? '✗  ' : isAnswer ? '→  ' : '   ';
+        lines.push(`  ${marker}${letter}. ${opt}`);
+      });
+      lines.push('');
+      if (isSkip)            lines.push(`  My answer:      (skipped)`);
+      else if (!isCorrect)   lines.push(`  My answer:      ${ua}`);
+      lines.push(`  Correct answer: ${q.answer}`);
+      if (isFlagged) pushFlagNote(lines, i);
+      lines.push('', '-'.repeat(60), '');
+    });
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `${quizFileName}_results.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+</script>
+</body>
+</html>
