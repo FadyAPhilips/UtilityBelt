@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Multigraph Builder</title>
+<style>
+  :root {
+    --bg: #12151a;
+    --panel: #1a1e26;
+    --line: #2b313d;
+    --text: #e6e9ef;
+    --muted: #8a92a3;
+    --accent: #5fb3ff;
+    --accent2: #ff9d5f;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+  }
+  #sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    padding: 20px;
+    overflow-y: auto;
+    height: 100vh;
+  }
+  h1 { font-size: 15px; letter-spacing: 0.02em; margin: 0 0 4px; }
+  .sub { font-size: 12px; color: var(--muted); margin: 0 0 20px; line-height: 1.5; }
+  fieldset { border: 1px solid var(--line); border-radius: 6px; padding: 12px; margin: 0 0 16px; }
+  legend { font-size: 11px; color: var(--accent); padding: 0 6px; letter-spacing: 0.05em; text-transform: uppercase; }
+  label { display: block; font-size: 11px; color: var(--muted); margin: 8px 0 4px; }
+  input, select {
+    width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--text);
+    padding: 6px 8px; border-radius: 4px; font-family: inherit; font-size: 13px;
+  }
+  button {
+    width: 100%; margin-top: 10px; background: var(--accent); color: #0a0d11; border: none;
+    padding: 8px; border-radius: 4px; font-family: inherit; font-weight: 600; font-size: 12px;
+    cursor: pointer; letter-spacing: 0.03em;
+  }
+  button:hover { opacity: 0.85; }
+  button.secondary { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  #edgeList { font-size: 12px; color: var(--muted); max-height: 160px; overflow-y: auto; line-height: 1.7; }
+  .edge-row { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 2px 0; }
+  .edge-row span:first-child { color: var(--text); }
+  .del { cursor: pointer; color: var(--accent2); }
+  #hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  #canvasWrap { flex: 1; position: relative; height: 100vh; }
+  svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  .node-circle { fill: #1a1e26; stroke: var(--accent); stroke-width: 2; cursor: grab; }
+  .node-label { fill: var(--text); font-size: 14px; font-family: inherit; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+  .edge-path { fill: none; stroke: #5fb3ff88; stroke-width: 2; }
+  .edge-label { fill: var(--muted); font-size: 11px; font-family: inherit; text-anchor: middle; }
+  .edge-label-bg { fill: var(--bg); opacity: 0.85; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h1>MULTIGRAPH BUILDER</h1>
+  <p class="sub">Add nodes and edges freely. Multiple edges between the same pair of nodes are drawn as separate curved paths, not merged into one. Drag nodes to reposition them.</p>
+
+  <fieldset>
+    <legend>Generate from dependency list</legend>
+    <label for="depInput">One node per line: <code>NODE: dep, dep, dep</code></label>
+    <textarea id="depInput" rows="7" style="width:100%; background:var(--bg); border:1px solid var(--line); color:var(--text); padding:6px 8px; border-radius:4px; font-family:inherit; font-size:12px; resize:vertical;">F1: D1, D2, D3
+F2: D1, D2, D4
+F3: D3, D4</textarea>
+    <button id="generateBtn">Generate graph</button>
+    <div id="hint">Any two nodes that list the same dependency get an edge labeled with that dependency. Shared deps become edges, not nodes.</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Add node</legend>
+    <label for="nodeId">Label</label>
+    <input id="nodeId" placeholder="e.g. F3">
+    <button id="addNodeBtn">Add node</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>Add edge</legend>
+    <label for="edgeFrom">From</label>
+    <select id="edgeFrom"></select>
+    <label for="edgeTo">To</label>
+    <select id="edgeTo"></select>
+    <label for="edgeLabel">Edge label (optional)</label>
+    <input id="edgeLabel" placeholder="e.g. D1">
+    <button id="addEdgeBtn">Add edge</button>
+    <div id="hint">Add it again for a second, parallel path between the same two nodes.</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Current edges</legend>
+    <div id="edgeList"></div>
+  </fieldset>
+
+  <button class="secondary" id="resetBtn">Reset to F1/F2 example</button>
+</div>
+
+<div id="canvasWrap">
+  <svg id="svg" viewBox="0 0 800 600"></svg>
+</div>
+
+<script>
+(function () {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById('svg');
+
+  let nodes = {};   // id -> {x, y}
+  let edges = [];    // {id, from, to, label, bend}
+  let nextEdgeId = 1;
+  let dragging = null;
+
+  function addNodeAt(id, x, y) {
+    if (nodes[id]) return false;
+    nodes[id] = { x, y };
+    return true;
+  }
+
+  function addEdgeInternal(from, to, label) {
+    if (!nodes[from] || !nodes[to]) return;
+    const parallelCount = edges.filter(e =>
+      (e.from === from && e.to === to) || (e.from === to && e.to === from)
+    ).length;
+    const dir = parallelCount % 2 === 0 ? 1 : -1;
+    const magnitude = 30 + Math.floor(parallelCount / 2) * 35;
+    const bend = dir * magnitude;
+    edges.push({ id: nextEdgeId++, from, to, label, bend });
+  }
+
+  function removeEdgeInternal(id) {
+    edges = edges.filter(e => e.id !== id);
+  }
+
+  function randomPos() {
+    const w = svg.viewBox.baseVal.width || 800;
+    const h = svg.viewBox.baseVal.height || 600;
+    return { x: 120 + Math.random() * (w - 240), y: 100 + Math.random() * (h - 200) };
+  }
+
+  function quadPoint(x1, y1, x2, y2, bend, t) {
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    const cx = mx + nx * bend;
+    const cy = my + ny * bend;
+    const omt = 1 - t;
+    const px = omt * omt * x1 + 2 * omt * t * cx + t * t * x2;
+    const py = omt * omt * y1 + 2 * omt * t * cy + t * t * y2;
+    return { x: px, y: py, cx, cy };
+  }
+
+  function render() {
+    svg.innerHTML = '';
+
+    edges.forEach(e => {
+      const a = nodes[e.from], b = nodes[e.to];
+      if (!a || !b) return;
+      const { cx, cy } = quadPoint(a.x, a.y, b.x, b.y, e.bend, 0.5);
+
+      const path = document.createElementNS(svgNS, 'path');
+      const d = `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`;
+      path.setAttribute('d', d);
+      path.setAttribute('class', 'edge-path');
+      svg.appendChild(path);
+
+      if (e.label) {
+        const mid = quadPoint(a.x, a.y, b.x, b.y, e.bend, 0.5);
+        const bg = document.createElementNS(svgNS, 'rect');
+        const text = document.createElementNS(svgNS, 'text');
+        text.setAttribute('x', mid.x);
+        text.setAttribute('y', mid.y);
+        text.setAttribute('class', 'edge-label');
+        text.textContent = e.label;
+        svg.appendChild(text);
+        requestAnimationFrame(() => {
+          try {
+            const bbox = text.getBBox();
+            bg.setAttribute('x', bbox.x - 3);
+            bg.setAttribute('y', bbox.y - 1);
+            bg.setAttribute('width', bbox.width + 6);
+            bg.setAttribute('height', bbox.height + 2);
+            bg.setAttribute('class', 'edge-label-bg');
+            svg.insertBefore(bg, text);
+          } catch (err) {}
+        });
+      }
+    });
+
+    Object.keys(nodes).forEach(id => {
+      const n = nodes[id];
+      const g = document.createElementNS(svgNS, 'g');
+      g.setAttribute('data-id', id);
+
+      const circle = document.createElementNS(svgNS, 'circle');
+      circle.setAttribute('cx', n.x);
+      circle.setAttribute('cy', n.y);
+      circle.setAttribute('r', 24);
+      circle.setAttribute('class', 'node-circle');
+      g.appendChild(circle);
+
+      const label = document.createElementNS(svgNS, 'text');
+      label.setAttribute('x', n.x);
+      label.setAttribute('y', n.y);
+      label.setAttribute('class', 'node-label');
+      label.textContent = id;
+      g.appendChild(label);
+
+      g.addEventListener('mousedown', (ev) => {
+        dragging = id;
+        ev.preventDefault();
+      });
+
+      svg.appendChild(g);
+    });
+
+    refreshSelects();
+    refreshEdgeList();
+  }
+
+  function svgPoint(evt) {
+    const pt = svg.createSVGPoint();
+    pt.x = evt.clientX;
+    pt.y = evt.clientY;
+    const ctm = svg.getScreenCTM().inverse();
+    const p = pt.matrixTransform(ctm);
+    return { x: p.x, y: p.y };
+  }
+
+  svg.addEventListener('mousemove', (ev) => {
+    if (!dragging) return;
+    const p = svgPoint(ev);
+    nodes[dragging].x = p.x;
+    nodes[dragging].y = p.y;
+    render();
+  });
+  window.addEventListener('mouseup', () => { dragging = null; });
+
+  function refreshSelects() {
+    const ids = Object.keys(nodes);
+    const from = document.getElementById('edgeFrom');
+    const to = document.getElementById('edgeTo');
+    [from, to].forEach(sel => {
+      const current = sel.value;
+      sel.innerHTML = ids.map(id => `<option value="${id}">${id}</option>`).join('');
+      if (ids.includes(current)) sel.value = current;
+    });
+  }
+
+  function refreshEdgeList() {
+    const list = document.getElementById('edgeList');
+    if (edges.length === 0) {
+      list.innerHTML = '<span style="opacity:0.5">No edges yet.</span>';
+      return;
+    }
+    list.innerHTML = edges.map(e => `
+      <div class="edge-row">
+        <span>${e.from} — ${e.to}${e.label ? ' (' + e.label + ')' : ''}</span>
+        <span class="del" data-edge-id="${e.id}">✕</span>
+      </div>
+    `).join('');
+    list.querySelectorAll('.del').forEach(el => {
+      el.addEventListener('click', () => {
+        removeEdgeInternal(parseInt(el.getAttribute('data-edge-id'), 10));
+        render();
+      });
+    });
+  }
+
+  document.getElementById('addNodeBtn').addEventListener('click', () => {
+    const input = document.getElementById('nodeId');
+    const id = input.value.trim();
+    if (!id || nodes[id]) { input.value = ''; return; }
+    const pos = randomPos();
+    addNodeAt(id, pos.x, pos.y);
+    input.value = '';
+    render();
+  });
+
+  document.getElementById('addEdgeBtn').addEventListener('click', () => {
+    const from = document.getElementById('edgeFrom').value;
+    const to = document.getElementById('edgeTo').value;
+    const labelInput = document.getElementById('edgeLabel');
+    const label = labelInput.value.trim();
+    if (!from || !to) return;
+    addEdgeInternal(from, to, label);
+    labelInput.value = '';
+    render();
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', resetExample);
+
+  function circleLayout(ids) {
+    const w = svg.viewBox.baseVal.width || 800;
+    const h = svg.viewBox.baseVal.height || 600;
+    const cx = w / 2, cy = h / 2;
+    const r = Math.min(w, h) / 2 - 100;
+    const n = ids.length;
+    ids.forEach((id, i) => {
+      const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+      addNodeAt(id, cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+    });
+  }
+
+  function parseDependencyList(text) {
+    // returns { nodeOrder: [F1, F2, ...], depsByNode: { F1: Set(D1,D2,...) } }
+    const depsByNode = {};
+    const nodeOrder = [];
+    text.split('\n').forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      const colonIdx = trimmed.indexOf(':');
+      if (colonIdx === -1) return;
+      const node = trimmed.slice(0, colonIdx).trim();
+      if (!node) return;
+      const deps = trimmed.slice(colonIdx + 1)
+        .split(',')
+        .map(d => d.trim())
+        .filter(Boolean);
+      if (!depsByNode[node]) {
+        depsByNode[node] = new Set();
+        nodeOrder.push(node);
+      }
+      deps.forEach(d => depsByNode[node].add(d));
+    });
+    return { nodeOrder, depsByNode };
+  }
+
+  function generateFromDeps() {
+    const text = document.getElementById('depInput').value;
+    const { nodeOrder, depsByNode } = parseDependencyList(text);
+    if (nodeOrder.length === 0) return;
+
+    nodes = {};
+    edges = [];
+    nextEdgeId = 1;
+
+    circleLayout(nodeOrder);
+
+    // Build dep -> [nodes that have it], preserving node order for stable pairing
+    const nodesByDep = {};
+    nodeOrder.forEach(node => {
+      depsByNode[node].forEach(dep => {
+        if (!nodesByDep[dep]) nodesByDep[dep] = [];
+        nodesByDep[dep].push(node);
+      });
+    });
+
+    // For each dependency shared by 2+ nodes, connect every pair with an edge labeled by that dependency
+    Object.keys(nodesByDep).forEach(dep => {
+      const holders = nodesByDep[dep];
+      for (let i = 0; i < holders.length; i++) {
+        for (let j = i + 1; j < holders.length; j++) {
+          addEdgeInternal(holders[i], holders[j], dep);
+        }
+      }
+    });
+
+    render();
+  }
+
+  document.getElementById('generateBtn').addEventListener('click', generateFromDeps);
+
+  function resetExample() {
+    nodes = {};
+    edges = [];
+    nextEdgeId = 1;
+    addNodeAt('F1', 250, 300);
+    addNodeAt('F2', 550, 300);
+    addEdgeInternal('F1', 'F2', 'D1');
+    addEdgeInternal('F1', 'F2', 'D2');
+    render();
+  }
+
+  generateFromDeps();
+})();
+</script>
+
+</body>
+</html>
