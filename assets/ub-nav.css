@@ -1,0 +1,51 @@
+/* UtilityBelt shared nav — floating "back home" badge.
+   Designed to sit on top of ANY applet's existing layout/theme
+   without needing to touch that applet's CSS or DOM flow. */
+
+#ub-nav {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 10px;
+  background: #14161c;
+  color: #e6e9ef;
+  border: 1px solid #2b313d;
+  border-radius: 999px;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  opacity: 0.88;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+#ub-nav:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+#ub-nav .ub-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+#ub-nav .ub-label {
+  color: #8a92a3;
+  font-weight: 500;
+}
+
+#ub-nav .ub-name {
+  color: #5fb3ff;
+}
+
+@media (max-width: 480px) {
+  #ub-nav .ub-label { display: none; }
+}
