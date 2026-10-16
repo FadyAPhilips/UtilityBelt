@@ -24,10 +24,11 @@
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; }
   .card h2 { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; font-weight:600; }
   label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
-  input[type=text], input[type=number], select {
+  input[type=text], input[type=number], select, textarea {
     width:100%; padding:8px 10px; font:inherit; color:var(--text); background:var(--field);
     border:1px solid var(--line); border-radius:8px; }
-  input:focus, select:focus, button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  textarea { min-height:130px; resize:vertical; }
+  input:focus, select:focus, textarea:focus, button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
   .row { display:flex; gap:12px; flex-wrap:wrap; }
   .row > div { flex:1 1 130px; }
   .check { display:flex; align-items:center; gap:8px; margin-top:12px; font-size:14px; color:var(--text); }
@@ -82,11 +83,12 @@
         <select id="mode">
           <option value="number">Number in a range</option>
           <option value="string">Random string</option>
+          <option value="list">Pick from a list</option>
         </select>
       </div>
       <div>
-        <label for="count">How many (1–5)</label>
-        <input type="number" id="count" min="1" max="5" value="1">
+        <label for="count">How many (1–8)</label>
+        <input type="number" id="count" min="1" max="8" value="1">
       </div>
       <div>
         <label for="dupes">Repeats</label>
@@ -125,6 +127,12 @@
         <input type="text" id="custom" placeholder="e.g. abc123" spellcheck="false">
       </div>
     </div>
+
+    <div id="listRules" class="hidden">
+      <label for="list">Values (one per line)</label>
+      <textarea id="list" spellcheck="false" placeholder="pikachu&#10;bulbasaur&#10;charmander"></textarea>
+      <div class="hint">Blank lines are ignored and duplicate lines count once.</div>
+    </div>
   </div>
 
   <div class="actions">
@@ -137,14 +145,14 @@
   <div class="card" style="margin-top:14px">
     <h2>Generated URLs</h2>
     <ul id="results"><li class="empty" style="background:none;padding:0">Nothing yet.</li></ul>
-    <div class="hint">Max 5 per batch, with a short cooldown between openings. If only one tab opens, allow pop-ups for this page.</div>
+    <div class="hint">Max 8 per batch, with a short cooldown between openings. If only one tab opens, allow pop-ups for this page.</div>
   </div>
 </div>
 
 <script>
 (function () {
   'use strict';
-  const MAX_PER_BATCH = 5;   // hard cap, enforced in code (not just the input)
+  const MAX_PER_BATCH = 8;   // hard cap, enforced in code (not just the input); keep in sync with #count max
   const COOLDOWN_MS = 3000;  // minimum gap between tab-opening actions
   const MAX_SAVED = 15;
   const STORE_KEY = 'ub-random-url-saved-v1';
@@ -157,7 +165,7 @@
     alnum: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
     hex: '0123456789abcdef'
   };
-  const RULE_FIELDS = ['mode','count','dupes','min','max','padW','charset','length','custom'];
+  const RULE_FIELDS = ['mode','count','dupes','min','max','padW','charset','length','custom','list'];
 
   const $ = id => document.getElementById(id);
   const statusEl = $('status');
@@ -202,7 +210,9 @@
       load.className = 'load'; load.title = s.tpl;
       load.textContent = s.tpl;
       const small = document.createElement('small');
-      small.textContent = s.rules.mode === 'string' ? 'string' : (s.rules.min + '–' + s.rules.max);
+      small.textContent = s.rules.mode === 'string' ? 'string'
+        : s.rules.mode === 'list' ? 'list (' + listItems(s.rules.list || '').length + ')'
+        : (s.rules.min + '–' + s.rules.max);
       load.appendChild(small);
       load.addEventListener('click', () => { $('template').value = s.tpl; applyRules(s.rules); say('Loaded template.'); });
       const del = document.createElement('button');
@@ -214,15 +224,25 @@
 
   /* ---------- generation ---------- */
   function syncMode() {
-    const num = $('mode').value === 'number';
-    $('numberRules').classList.toggle('hidden', !num);
-    $('stringRules').classList.toggle('hidden', num);
+    const mode = $('mode').value;
+    $('numberRules').classList.toggle('hidden', mode !== 'number');
+    $('stringRules').classList.toggle('hidden', mode !== 'string');
+    $('listRules').classList.toggle('hidden', mode !== 'list');
     $('customWrap').classList.toggle('hidden', $('charset').value !== 'custom');
+  }
+
+  function listItems(text) {
+    return Array.from(new Set(text.split(/\r?\n/).map(s => s.trim()).filter(Boolean)));
   }
 
   function buildValues(n) {
     let make, space;
-    if ($('mode').value === 'number') {
+    if ($('mode').value === 'list') {
+      const items = listItems($('list').value);
+      if (!items.length) throw new Error('Add at least one value to the list.');
+      space = items.length;
+      make = () => items[randInt(0, items.length - 1)];
+    } else if ($('mode').value === 'number') {
       let lo = Math.floor(Number($('min').value)), hi = Math.floor(Number($('max').value));
       if (!Number.isFinite(lo) || !Number.isFinite(hi)) throw new Error('Min and max must be numbers.');
       if (lo > hi) [lo, hi] = [hi, lo];

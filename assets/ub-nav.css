@@ -11,9 +11,9 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px 6px 10px;
-  background: #14161c;
-  color: #e6e9ef;
-  border: 1px solid #2b313d;
+  background: #181818;
+  color: #ececec;
+  border: 1px solid #333333;
   border-radius: 999px;
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
   font-size: 12px;
@@ -38,12 +38,12 @@
 }
 
 #ub-nav .ub-label {
-  color: #8a92a3;
+  color: #8c8c8c;
   font-weight: 500;
 }
 
 #ub-nav .ub-name {
-  color: #5fb3ff;
+  color: #f6d03f;
 }
 
 @media (max-width: 480px) {
