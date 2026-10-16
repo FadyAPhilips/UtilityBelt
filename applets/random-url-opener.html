@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Random URL Opener</title>
+<link rel="stylesheet" href="../assets/ub-nav.css">
+<script src="../assets/ub-nav.js" defer></script>
+<style>
+  :root {
+    --bg:#f4f5f7; --card:#fff; --text:#1c1f24; --muted:#6b7280; --line:#d9dce1;
+    --accent:#4f46e5; --accent-text:#fff; --danger:#c0392b; --field:#fff; --chip:#eef0f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14161a; --card:#1d2026; --text:#e8eaed; --muted:#9aa1ab; --line:#2f343c;
+      --accent:#818cf8; --accent-text:#14161a; --danger:#ef7b6e; --field:#14161a; --chip:#262a32; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px 14px 60px; background:var(--bg); color:var(--text);
+    font:15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width:640px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; }
+  .card h2 { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; font-weight:600; }
+  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
+  input[type=text], input[type=number], select {
+    width:100%; padding:8px 10px; font:inherit; color:var(--text); background:var(--field);
+    border:1px solid var(--line); border-radius:8px; }
+  input:focus, select:focus, button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .row > div { flex:1 1 130px; }
+  .check { display:flex; align-items:center; gap:8px; margin-top:12px; font-size:14px; color:var(--text); }
+  .check label { margin:0; color:var(--text); font-size:14px; }
+  .check input[type=number] { width:76px; }
+  button { font:inherit; padding:9px 16px; border-radius:8px; cursor:pointer;
+    border:1px solid var(--line); background:var(--card); color:var(--text); }
+  button.primary { background:var(--accent); color:var(--accent-text); border-color:var(--accent); font-weight:600; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; }
+  #status { margin-top:10px; min-height:1.4em; font-size:14px; color:var(--muted); }
+  #status.err { color:var(--danger); }
+  #results { list-style:none; margin:0; padding:0; word-break:break-all; }
+  #results li { padding:8px 10px; border-radius:8px; background:var(--chip); margin-bottom:6px; font-size:14px; }
+  #results a { color:var(--accent); text-decoration:none; }
+  #results a:hover { text-decoration:underline; }
+  .empty { color:var(--muted); font-size:14px; }
+  .hint { color:var(--muted); font-size:13px; margin-top:6px; }
+  code { background:var(--chip); padding:1px 5px; border-radius:4px; font-size:13px; }
+  .hidden { display:none !important; }
+  #saved { list-style:none; margin:0; padding:0; }
+  #saved li { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  #saved .load { flex:1; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:var(--chip); border-color:transparent; }
+  #saved .load small { color:var(--muted); margin-left:8px; }
+  #saved .del { padding:8px 10px; color:var(--muted); }
+  .head { display:flex; justify-content:space-between; align-items:center; }
+  .head button { padding:3px 10px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Random URL Opener</h1>
+  <p class="sub">Fill a random value into a URL and open it in new tabs.</p>
+
+  <div class="card">
+    <h2>URL template</h2>
+    <input type="text" id="template" value="https://example.com/pokemon/?id={rand}" spellcheck="false" autocomplete="off">
+    <div class="hint">Put <code>{rand}</code> (or <code>[rand]</code>) where the random value goes.</div>
+  </div>
+
+  <div class="card hidden" id="savedCard">
+    <div class="head"><h2>Recent templates</h2><button id="clearSaved">Clear all</button></div>
+    <ul id="saved"></ul>
+    <div class="hint">Saved in this browser only. Clicking one restores its rules too.</div>
+  </div>
+
+  <div class="card">
+    <h2>Random value rules</h2>
+    <div class="row">
+      <div>
+        <label for="mode">Type</label>
+        <select id="mode">
+          <option value="number">Number in a range</option>
+          <option value="string">Random string</option>
+        </select>
+      </div>
+      <div>
+        <label for="count">How many (1–5)</label>
+        <input type="number" id="count" min="1" max="5" value="1">
+      </div>
+      <div>
+        <label for="dupes">Repeats</label>
+        <select id="dupes">
+          <option value="unique">Unique (no repeats)</option>
+          <option value="dupes">Allow duplicates</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="numberRules" class="row">
+      <div><label for="min">Min</label><input type="number" id="min" value="1"></div>
+      <div><label for="max">Max</label><input type="number" id="max" value="1000"></div>
+      <div style="flex-basis:100%">
+        <div class="check"><input type="checkbox" id="padOn"><label for="padOn">Zero-pad to width</label>
+          <input type="number" id="padW" min="1" max="20" value="3"></div>
+      </div>
+    </div>
+
+    <div id="stringRules" class="row hidden">
+      <div>
+        <label for="charset">Characters</label>
+        <select id="charset">
+          <option value="digits">Digits (0-9)</option>
+          <option value="lower">Lowercase letters</option>
+          <option value="upper">Uppercase letters</option>
+          <option value="letters">Letters (a-z, A-Z)</option>
+          <option value="alnum" selected>Alphanumeric</option>
+          <option value="hex">Hex (0-9, a-f)</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div><label for="length">Length</label><input type="number" id="length" min="1" max="64" value="8"></div>
+      <div id="customWrap" class="hidden" style="flex-basis:100%">
+        <label for="custom">Custom characters</label>
+        <input type="text" id="custom" placeholder="e.g. abc123" spellcheck="false">
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="genOpen" class="primary">Generate &amp; open</button>
+    <button id="gen">Generate only</button>
+    <button id="openAll" disabled>Open list</button>
+  </div>
+  <div id="status"></div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>Generated URLs</h2>
+    <ul id="results"><li class="empty" style="background:none;padding:0">Nothing yet.</li></ul>
+    <div class="hint">Max 5 per batch, with a short cooldown between openings. If only one tab opens, allow pop-ups for this page.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const MAX_PER_BATCH = 5;   // hard cap, enforced in code (not just the input)
+  const COOLDOWN_MS = 3000;  // minimum gap between tab-opening actions
+  const MAX_SAVED = 15;
+  const STORE_KEY = 'ub-random-url-saved-v1';
+  const PLACEHOLDER = /[\[{]rand[\]}]/i;
+  const SETS = {
+    digits: '0123456789',
+    lower: 'abcdefghijklmnopqrstuvwxyz',
+    upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    letters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    alnum: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+    hex: '0123456789abcdef'
+  };
+  const RULE_FIELDS = ['mode','count','dupes','min','max','padW','charset','length','custom'];
+
+  const $ = id => document.getElementById(id);
+  const statusEl = $('status');
+  let current = [];
+  let cooling = false;
+
+  function say(msg, isErr) { statusEl.textContent = msg; statusEl.className = isErr ? 'err' : ''; }
+  function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
+
+  /* ---------- saved templates (localStorage) ---------- */
+  function loadSaved() {
+    try { const v = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
+  }
+  function writeSaved(list) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch (e) { /* storage blocked: ignore */ }
+  }
+  function currentRules() {
+    const r = { padOn: $('padOn').checked };
+    RULE_FIELDS.forEach(id => r[id] = $(id).value);
+    return r;
+  }
+  function applyRules(r) {
+    RULE_FIELDS.forEach(id => { if (r[id] !== undefined) $(id).value = r[id]; });
+    $('padOn').checked = !!r.padOn;
+    syncMode();
+  }
+  function saveCurrent(tpl) {
+    const list = loadSaved().filter(s => s.tpl !== tpl);
+    list.unshift({ tpl: tpl, rules: currentRules(), t: Date.now() });
+    writeSaved(list.slice(0, MAX_SAVED));
+    renderSaved();
+  }
+  function renderSaved() {
+    const list = loadSaved();
+    const ul = $('saved');
+    ul.innerHTML = '';
+    $('savedCard').classList.toggle('hidden', !list.length);
+    list.forEach((s, i) => {
+      const li = document.createElement('li');
+      const load = document.createElement('button');
+      load.className = 'load'; load.title = s.tpl;
+      load.textContent = s.tpl;
+      const small = document.createElement('small');
+      small.textContent = s.rules.mode === 'string' ? 'string' : (s.rules.min + '–' + s.rules.max);
+      load.appendChild(small);
+      load.addEventListener('click', () => { $('template').value = s.tpl; applyRules(s.rules); say('Loaded template.'); });
+      const del = document.createElement('button');
+      del.className = 'del'; del.textContent = '✕'; del.title = 'Remove'; del.setAttribute('aria-label', 'Remove');
+      del.addEventListener('click', () => { const l = loadSaved(); l.splice(i, 1); writeSaved(l); renderSaved(); });
+      li.appendChild(load); li.appendChild(del); ul.appendChild(li);
+    });
+  }
+
+  /* ---------- generation ---------- */
+  function syncMode() {
+    const num = $('mode').value === 'number';
+    $('numberRules').classList.toggle('hidden', !num);
+    $('stringRules').classList.toggle('hidden', num);
+    $('customWrap').classList.toggle('hidden', $('charset').value !== 'custom');
+  }
+
+  function buildValues(n) {
+    let make, space;
+    if ($('mode').value === 'number') {
+      let lo = Math.floor(Number($('min').value)), hi = Math.floor(Number($('max').value));
+      if (!Number.isFinite(lo) || !Number.isFinite(hi)) throw new Error('Min and max must be numbers.');
+      if (lo > hi) [lo, hi] = [hi, lo];
+      space = hi - lo + 1;
+      const w = $('padOn').checked ? Math.max(1, Math.min(20, Number($('padW').value) || 1)) : 0;
+      make = () => { const v = String(randInt(lo, hi)); return w ? v.padStart(w, '0') : v; };
+    } else {
+      const chars = $('charset').value === 'custom'
+        ? Array.from(new Set($('custom').value.split('')))
+        : SETS[$('charset').value].split('');
+      if (!chars.length) throw new Error('Enter at least one custom character.');
+      const len = Math.max(1, Math.min(64, Math.floor(Number($('length').value)) || 1));
+      space = Math.pow(chars.length, len);
+      make = () => { let s = ''; for (let i = 0; i < len; i++) s += chars[randInt(0, chars.length - 1)]; return s; };
+    }
+
+    if ($('dupes').value === 'dupes') {
+      const out = [];
+      for (let i = 0; i < n; i++) out.push(make());
+      return out;
+    }
+    n = Math.min(n, space); // can't make more unique values than exist
+    const seen = new Set();
+    let guard = 0;
+    while (seen.size < n && guard++ < 10000) seen.add(make());
+    return Array.from(seen);
+  }
+
+  function generate() {
+    const tpl = $('template').value.trim();
+    if (!PLACEHOLDER.test(tpl)) { say('Template needs a {rand} placeholder.', true); return false; }
+
+    let n = Math.floor(Number($('count').value));
+    if (!Number.isFinite(n) || n < 1) n = 1;
+    if (n > MAX_PER_BATCH) { n = MAX_PER_BATCH; $('count').value = MAX_PER_BATCH; }
+
+    let values;
+    try { values = buildValues(n); } catch (e) { say(e.message, true); return false; }
+
+    const urls = values.map(v => tpl.replace(PLACEHOLDER, encodeURIComponent(v)));
+    for (const u of urls) {
+      let p;
+      try { p = new URL(u); } catch (e) { say('That does not look like a valid URL.', true); return false; }
+      if (p.protocol !== 'http:' && p.protocol !== 'https:') { say('Only http(s) URLs are allowed.', true); return false; }
+    }
+
+    current = urls;
+    const ul = $('results');
+    ul.innerHTML = '';
+    urls.forEach(u => {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = u; a.textContent = u; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      li.appendChild(a); ul.appendChild(li);
+    });
+    $('openAll').disabled = cooling || !urls.length;
+    saveCurrent(tpl);
+    say(urls.length < n ? 'Only ' + urls.length + ' unique value(s) possible with these rules.' : 'Generated ' + urls.length + '.');
+    return true;
+  }
+
+  /* ---------- opening ---------- */
+  function startCooldown() {
+    cooling = true;
+    $('genOpen').disabled = true; $('openAll').disabled = true;
+    setTimeout(() => {
+      cooling = false;
+      $('genOpen').disabled = false;
+      $('openAll').disabled = !current.length;
+    }, COOLDOWN_MS);
+  }
+
+  function openAll() {
+    if (cooling || !current.length) return;
+    const list = current.slice(0, MAX_PER_BATCH);
+    let opened = 0;
+    list.forEach(u => {
+      const w = window.open(u, '_blank');
+      if (w) { try { w.opener = null; } catch (e) {} opened++; }
+    });
+    startCooldown();
+    if (opened < list.length) say('Opened ' + opened + ' of ' + list.length + '. Your browser blocked some pop-ups; allow them for this page or click the links.', true);
+    else say('Opened ' + opened + ' tab' + (opened === 1 ? '' : 's') + '.');
+  }
+
+  $('mode').addEventListener('change', syncMode);
+  $('charset').addEventListener('change', syncMode);
+  $('gen').addEventListener('click', generate);
+  $('openAll').addEventListener('click', openAll);
+  $('genOpen').addEventListener('click', () => { if (generate()) openAll(); });
+  $('clearSaved').addEventListener('click', () => { writeSaved([]); renderSaved(); });
+  syncMode();
+  renderSaved();
+})();
+</script>
+</body>
+</html>
