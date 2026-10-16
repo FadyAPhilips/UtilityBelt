@@ -14,6 +14,15 @@
       '<span class="ub-label">Back to</span>' +
       '<span class="ub-name">UtilityBelt</span>';
     document.body.appendChild(a);
+
+    // Shared favicon, unless the applet declares its own.
+    if (!document.querySelector('link[rel~="icon"]')) {
+      var icon = document.createElement("link");
+      icon.rel = "icon";
+      icon.type = "image/png";
+      icon.href = "../assets/utility-belt.png";
+      document.head.appendChild(icon);
+    }
   }
 
   if (document.readyState === "loading") {

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>UtilityBelt</title>
+<link rel="icon" type="image/png" href="assets/utility-belt.png">
 <style>
   :root {
     --bg: #0d0f13;
@@ -46,6 +47,12 @@
     font-weight: 700;
   }
   h1 .dim { color: var(--muted); font-weight: 500; }
+  h1 .logo {
+    width: 1.1em;
+    height: 1.1em;
+    vertical-align: -0.2em;
+    margin-right: 0.3em;
+  }
   .tagline {
     color: var(--muted);
     font-size: 14px;
@@ -152,14 +159,17 @@
     margin: 56px auto 0;
     color: var(--muted);
     font-size: 11px;
+    line-height: 1.7;
   }
+  footer a { color: var(--muted); }
+  footer a:hover { color: var(--accent); }
 </style>
 </head>
 <body>
 
 <header>
   <p class="eyebrow">/ home</p>
-  <h1>Utility<span class="dim">Belt</span></h1>
+  <h1><img class="logo" src="assets/utility-belt.png" alt="">Utility<span class="dim">Belt</span></h1>
   <p class="tagline">A running collection of small, self-contained web tools. No installs, no accounts — pick one off the belt and use it.</p>
 </header>
 
@@ -172,7 +182,10 @@
 
 <main class="pouches" id="pouches"></main>
 
-<footer>UtilityBelt &mdash; each tool below is a single self-contained page. No backend, no build step.</footer>
+<footer>
+  UtilityBelt &mdash; each tool below is a single self-contained page. No backend, no build step.<br>
+  <a href="https://www.flaticon.com/free-icons/utility-belt" title="utility belt icons">Utility belt icon from Flaticon</a>
+</footer>
 
 <script>
   // Add a future applet here: { name, file, description }
